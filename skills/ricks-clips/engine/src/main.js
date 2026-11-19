@@ -18,12 +18,15 @@ import { MOODS, skyMaterial, preload, LOADED } from './world.js';
 import { CHAR } from './toon.js';
 
 const W = 720, H = 1280;
+// ?preview=1 : half resolution, hard shadows, no depth of field - about 4-6x faster, for checking work in progress
+const PREVIEW = new URLSearchParams(location.search).has('preview');
+const RES = PREVIEW ? 0.5 : 1;
 const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(1);
+renderer.setPixelRatio(RES);
 renderer.setSize(W, H);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = PREVIEW ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
 document.getElementById('stage').prepend(renderer.domElement);
 
 // one image-based light per mood, made from its own sky
@@ -66,7 +69,7 @@ export function makeStage({ mood = 'day', shadowSize = 4, target = [0, 0, 0], fo
 }
 
 // ---------- post: bloom for practical lights, then a grade (contrast, saturation, warm/cool split, vignette) ----------
-const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4, type: THREE.HalfFloatType });
+const rt = new THREE.WebGLRenderTarget(W * RES, H * RES, { samples: PREVIEW ? 0 : 4, type: THREE.HalfFloatType });
 const composer = new EffectComposer(renderer, rt);
 const renderPass = new RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
 const bokeh = new BokehPass(new THREE.Scene(), new THREE.PerspectiveCamera(), { focus: 2, aperture: 0, maxblur: 0.01 });
@@ -165,6 +168,8 @@ function getShot(i) {
 }
 
 window.DURATION = DURATION;
+window.SHOT_INFO = () => SHOTS.map(s => ({ start: s.start, end: Math.min(s.end, DURATION), src: s.build.toString() }));
+window.TRANSITION_TIMES = TRANSITIONS.map(t => t.t);
 const dashEl = document.getElementById('dash');
 const xfadeEl = document.getElementById('xfade'), xctx = xfadeEl.getContext('2d');
 function shotIndex(t) { let i = SHOTS.findIndex(s => t >= s.start && t < s.end); return i < 0 ? SHOTS.length - 1 : i; }
@@ -180,7 +185,7 @@ function renderShot(idx, t, extra) {
   renderPass.scene = bokeh.scene = shot.scene; renderPass.camera = bokeh.camera = cam;
   // depth of field: return { dof: { focus: metres to the subject, blur: 0..1 } } - soft backgrounds like the references
   const dof = r.dof;
-  bokeh.enabled = !!(dof && (dof.blur ?? 0.5) > 0);
+  bokeh.enabled = !PREVIEW && !!(dof && (dof.blur ?? 0.5) > 0);
   if (bokeh.enabled) { bokeh.uniforms.focus.value = dof.focus ?? cam.position.length(); bokeh.uniforms.aperture.value = 0.0025 * (dof.blur ?? 0.5); bokeh.uniforms.maxblur.value = 0.012 * (dof.blur ?? 0.5) + 0.002; bokeh.uniforms.nearClip.value = cam.near; bokeh.uniforms.farClip.value = cam.far; }
   bloom.strength = r.bloom ?? 0.3;
   bloom.threshold = r.bloomThreshold ?? 1.0;
