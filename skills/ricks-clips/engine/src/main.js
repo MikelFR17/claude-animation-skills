@@ -14,7 +14,7 @@ const { SHOTS, CAPTIONS, DURATION, FADES } = EDIT;
 //   zoom : rush into the centre of the outgoing shot and land in the next (0.5 s) - aim it at an eye, a window, a hole
 //          and open the next shot on a similar round shape (match cut)
 const TRANSITIONS = EDIT.TRANSITIONS || [];
-import { MOODS, skyMaterial } from './world.js';
+import { MOODS, skyMaterial, preload, LOADED } from './world.js';
 import { CHAR } from './toon.js';
 
 const W = 720, H = 1280;
@@ -37,13 +37,21 @@ function envFor(name, m) {
 
 // makeStage({ mood: 'golden', shadowSize: 4, target: [0,0,0] }) -> a scene with sky, sun/moon, fill, fog and env lighting.
 // scene.userData: { sky, sun, hemi, mood } — tweak per shot (e.g. sun.intensity for lightning, sky.material.uniforms.flash).
-export function makeStage({ mood = 'day', shadowSize = 4, target = [0, 0, 0], fog = true, env = 0.6, overrides = {} } = {}) {
+// hdri: name of a .hdr in ASSETS - it lights everything (reflections, ambient). hdriBackground: true shows it as the sky
+// instead of the painted one (photographic skies; the painted sky usually suits the cartoon look better).
+const hdriEnvs = new Map();
+function hdriEnv(name) {
+  if (!hdriEnvs.has(name)) { const t = LOADED.hdri[name]; hdriEnvs.set(name, t ? pmrem.fromEquirectangular(t).texture : null); }
+  return hdriEnvs.get(name);
+}
+export function makeStage({ mood = 'day', shadowSize = 4, target = [0, 0, 0], fog = true, env = 0.6, overrides = {}, hdri = null, hdriBackground = false } = {}) {
   const m = { ...MOODS[mood], ...overrides };
   const scene = new THREE.Scene();
-  scene.environment = envFor(mood + JSON.stringify(overrides), m);
+  scene.environment = (hdri && hdriEnv(hdri)) || envFor(mood + JSON.stringify(overrides), m);
   scene.environmentIntensity = env;
+  if (hdri && hdriBackground && LOADED.hdri[hdri]) { scene.background = LOADED.hdri[hdri]; scene.backgroundIntensity = m.exposure ?? 1; }
   const sky = new THREE.Mesh(new THREE.SphereGeometry(200, 48, 24), skyMaterial(m));
-  sky.frustumCulled = false; sky.renderOrder = -10; scene.add(sky);
+  sky.frustumCulled = false; sky.renderOrder = -10; if (!(hdri && hdriBackground)) scene.add(sky);
   const hemi = new THREE.HemisphereLight(m.hemi[0], m.hemi[1], m.hemi[2]); scene.add(hemi);
   const sun = new THREE.DirectionalLight(m.sun[0], m.sun[1]);
   sun.position.set(target[0] + m.sunDir[0], target[1] + m.sunDir[1], target[2] + m.sunDir[2]);
@@ -233,7 +241,7 @@ window.renderAt = (t) => {
 
 // interactive preview: ?t=12.3 for a still, otherwise realtime playback (click to start with audio.m4a)
 const qs = new URLSearchParams(location.search);
-window.ready = document.fonts.ready.then(() => true);
+window.ready = Promise.all([document.fonts.ready, preload(EDIT.ASSETS || {})]).then(() => true);
 if (qs.has('t')) window.ready.then(() => window.renderAt(parseFloat(qs.get('t'))));
 else if (!qs.has('render')) {
   const audio = new Audio('./audio.m4a');

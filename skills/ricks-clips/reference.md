@@ -64,4 +64,4 @@ Whip pans were not seen. Use `dissolve` by default and keep whips for rare comic
 - **Comic beats:** a face pressed to a windshield, an object flying past the lens, a character face-down in the dirt.
 
 ## Next step for matching the detail
-The remaining gap is the set pieces: trees, vehicles, buildings, terrain. The plan is to load real CC0 models (glTF) and HDRI skies. This needs the session's network to allow the model libraries (Poly Haven, Kenney, Quaternius, Poly Pizza), or packs the user supplies. Optionally, AI-generated background plates with depth parallax for single-angle establishing shots.
+The remaining gap is the set pieces: trees, vehicles, buildings, terrain. The engine now loads real CC0 models (glTF/GLB) and HDRI skies through `kit/assets.py`: Poly Haven for realistic props, trees, ships, rocks and skies, and Kenney for stylised cars, cities, nature, pirates and trains. Quaternius packs come through itch.io or Google Drive, which this network doesn't reach; Poly Pizza blocks automated downloads. Still to come: denser set dressing per location, and optionally AI-generated background plates with depth parallax for single-angle establishing shots.

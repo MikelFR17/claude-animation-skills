@@ -351,3 +351,44 @@ export function burst({ kind = 'bills', count = 400, origin = [0, 0.5, 0], t0 = 
   m.update(0);
   return m;
 }
+
+// ---------- real models (glTF/GLB) and HDRI skies ----------
+// List what a short uses in shots.js:   export const ASSETS = { sedan: 'assets/kenney/car-kit/sedan.glb', sky: 'assets/polyhaven/hdri/x_1k.hdr' }
+// main.js loads them all before the first frame; then model('sedan', {...}) returns a fresh copy, synchronously,
+// and makeStage({ hdri: 'sky' }) lights the scene with that sky.
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
+export const LOADED = { models: {}, hdri: {} };
+export async function preload(map = {}) {
+  const gl = new GLTFLoader(), rg = new RGBELoader();
+  await Promise.all(Object.entries(map).map(async ([name, path]) => {
+    try {
+      if (/\.hdr$/i.test(path)) { const t = await rg.loadAsync(path); t.mapping = THREE.EquirectangularReflectionMapping; LOADED.hdri[name] = t; }
+      else LOADED.models[name] = (await gl.loadAsync(path)).scene;
+    } catch (e) { console.error(`asset "${name}" (${path}) failed to load: ${e.message || e}`); }
+  }));
+}
+// model(name, { scale, height, outline, color, shadows }) -> a copy of a loaded model.
+//   height: scale it so it is this many metres tall (handy across kits);  outline: ink width (e.g. 0.008) to match the cast;
+//   color: tint every material;  the model stands on y=0, centred on x/z.
+export function model(name, o = {}) {
+  const src = LOADED.models[name];
+  if (!src) { console.error(`model "${name}" is not in ASSETS`); return new THREE.Group(); }
+  const m = skeletonClone(src);
+  const g = new THREE.Group(); g.add(m);
+  m.traverse(c => {
+    if (!c.isMesh) return;
+    c.castShadow = o.shadows ?? true; c.receiveShadow = true;
+    c.material = c.material.clone();
+    if (o.color != null) c.material.color = new THREE.Color(o.color);
+    if (o.rough != null) c.material.roughness = o.rough;
+  });
+  const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3());
+  const s = o.height ? o.height / Math.max(size.y, 1e-6) : (o.scale ?? 1);
+  m.scale.setScalar(s);
+  const b2 = new THREE.Box3().setFromObject(m), c2 = b2.getCenter(new THREE.Vector3());
+  m.position.set(-c2.x, -b2.min.y, -c2.z);
+  if (o.outline) m.traverse(c => { if (c.isMesh && !c.userData.isOutline) outline(c, o.outline); });
+  return g;
+}
