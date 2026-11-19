@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ricks-clips</title>
+<style>
+  @font-face { font-family: 'Cap'; src: url('node_modules/@fontsource/montserrat/files/montserrat-latin-800-normal.woff2') format('woff2'); font-weight: 800; }
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { position: relative; width: 720px; height: 1280px; overflow: hidden; }
+  canvas { display: block; }
+  /* heavy white type with a thick black outline; position, size and mode come from CAPTION_STYLE in shots.js */
+  #cap {
+    position: absolute; left: 50px; right: 50px; top: 768px; text-align: center; transform-origin: 50% 50%;
+    font: 800 50px/1.1 'Cap', sans-serif; color: #fff; letter-spacing: 0.2px;
+    -webkit-text-stroke: 9px #0d0b0a; paint-order: stroke fill;
+    text-shadow: 0 4px 0 #0d0b0a, 0 6px 14px rgba(0,0,0,.45);
+  }
+  #xfade { position: absolute; left: 0; top: 0; width: 720px; height: 1280px; opacity: 0; pointer-events: none; }
+  #dash { position: absolute; left: 34px; right: 34px; top: 40px; display: none; color: #fff; font: 600 17px/1.5 'Courier New', monospace; text-shadow: 0 0 3px rgba(0,0,0,.8); letter-spacing: 1px; }
+  #dash .rec { color: #ff3b30; } #dash .spd { float: right; }
+  #fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  #flash { position: absolute; inset: 0; background: #eaf3ff; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+  #hud { position: fixed; left: 730px; top: 10px; color: #aaa; font: 13px monospace; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./node_modules/three/build/three.module.js",
+  "three/addons/": "./node_modules/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="stage"><canvas id="xfade" width="720" height="1280"></canvas><div id="dash"></div><div id="flash"></div><div id="fade"></div><div id="cap"></div></div>
+<div id="hud"></div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
