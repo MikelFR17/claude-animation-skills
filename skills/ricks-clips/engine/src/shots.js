@@ -1,4 +1,4 @@
-// THE EDIT. Example short: "Why every old ship had a cat" (28 s, 11 shots).
+// THE EDIT. Example short: "Why every old ship had a cat" (31 s, 11 shots). The plan behind it is plan.md.
 // Each shot: build({ makeStage }) -> { scene, camera, update(t) }. update gets the time inside the shot and may
 // return { exposure, bloom, bloomThreshold, vignette, saturation, tint:[r,g,b], flash }.
 import * as THREE from 'three';
@@ -8,18 +8,22 @@ import { ship, sea, seaHeight, wave, barrel, crate, sack, ropeCoil, rope, lanter
 import { kf, lerp, smooth, easeOut, easeIn, easeInOut, range, clamp, V, cam, place, shake } from './anim.js';
 
 export const CAPTIONS = [
-  [0.25, 'For centuries,'], [1.45, 'almost'], [1.91, 'every'], [2.32, 'ship'], [2.67, 'had'],
+  [0.25, 'For *centuries,*'], [1.45, 'almost'], [1.91, 'every'], [2.32, 'ship'], [2.67, 'had'],
   [2.96, 'one'], [3.26, 'crew'], [3.61, 'member'], [4.07, 'who'], [4.36, 'never'],
-  [4.77, 'pulled'], [5.23, 'a single'], [5.91, 'rope.'], [6.71, 'The cat.'], [7.75, 'Down'],
-  [8.10, 'in the'], [8.63, 'hold,'], [9.26, 'rats'], [9.61, 'ate'], [9.91, 'the food,'],
-  [10.83, 'chewed'], [11.29, 'the ropes'], [11.99, 'and spread'], [12.75, 'disease.'], [13.71, 'One'],
+  [4.77, 'pulled'], [5.23, 'a single'], [5.91, 'rope.'], [6.71, 'The *cat.*'], [7.75, 'Down'],
+  [8.10, 'in the'], [8.63, 'hold,'], [9.26, '*rats*'], [9.61, 'ate'], [9.91, 'the food,'],
+  [10.83, 'chewed'], [11.29, 'the ropes'], [11.99, 'and spread'], [12.75, '*disease.*'], [13.71, 'One'],
   [14.01, 'good'], [14.36, 'cat'], [14.65, 'could'], [15.06, 'save'], [15.41, 'the whole'],
   [16.11, 'voyage.'], [17.02, 'Sailors'], [17.53, 'even'], [17.88, 'believed'], [18.45, 'cats'],
-  [18.80, 'brought'], [19.32, 'luck.'], [20.12, 'And if'], [20.65, 'one'], [20.95, 'fell'],
-  [21.30, 'overboard,'], [22.20, 'a storm'], [22.83, 'was coming.'], [24.03, 'The Royal'], [24.73, 'Navy'],
-  [25.08, 'only'], [25.43, 'banned'], [25.89, 'ship'], [26.24, 'cats'], [26.59, 'in 1975.', 27.53],
+  [18.80, 'brought'], [19.32, '*luck.*'], [20.12, 'And if'], [20.65, 'one'], [20.95, 'fell'],
+  [21.30, 'overboard,'], [22.20, 'a *storm*'], [22.83, 'was coming.'], [24.03, 'The Royal'], [24.73, 'Navy'],
+  [25.08, 'only'], [25.43, 'banned'], [25.89, 'ship'], [26.24, 'cats'], [26.59, 'in *1975.*'],
+  [27.63, 'Would'], [28.04, 'you'], [28.33, 'have'], [28.68, 'sailed'], [29.14, 'without'],
+  [29.66, 'one?', 30.30],
 ];
-export const DURATION = 27.98;
+export const DURATION = 30.75;
+// lines of up to 4 words, the spoken word in yellow, *starred* words always yellow; centred above the lower third
+export const CAPTION_STYLE = { mode: 'group', maxWords: 4, maxChars: 18, y: 0.6 };
 // [fadeInStart, fullStart, fullEnd, fadeOutEnd] dips to black
 export const FADES = [[19.86, 19.98, 20.02, 20.2]];
 
@@ -350,10 +354,14 @@ function shotOrder({ makeStage }) {
     // the stamp follows the officer's right hand
     officer.root.updateMatrixWorld(true); const hp = officer.hands.r.getWorldPosition(new THREE.Vector3());
     stamp.position.x = lerp(hp.x, 0.07, 0.6); stamp.position.z = lerp(hp.z, 0.16, 0.6);
-    cat.neck.rotation.set(0.05, t > tStamp ? 0.5 : 0.2, 0); cat.tail(t, 0.8, 0.5);
-    cat.setFace({ eyes: t > tStamp + 0.3 ? 'half' : 'open', look: [-0.75, -0.25], mouth: t > tStamp + 0.3 ? 'flat' : 'cat' });
+    // closing question (27.63 = 3.68 s in): the cat turns to the camera and the camera pushes in on it
+    const close = smooth(range(t, 3.55, 4.6));
+    cat.root.rotation.y = lerp(-2.2, 0.3, close); cat.neck.rotation.set(0.05, lerp(t > tStamp ? 0.5 : 0.2, 0, close), 0); cat.tail(t, 0.8, 0.5);
+    cat.setFace(close > 0.5 ? { eyes: blink(t, 5) ? 'closed' : 'open', look: [0, 0], mouth: 'cat', brows: 'raised' }
+      : { eyes: t > tStamp + 0.3 ? 'half' : 'open', look: [-0.75, -0.25], mouth: t > tStamp + 0.3 ? 'flat' : 'cat' });
     const sh = shake(t, pulse(t, tStamp, 0.08) * 5, 9);
-    place(C, [0.55 + sh[0], 1.35 + sh[1], 2.2 - t * 0.12], [0.15, 1.0, -0.1]);
+    const cp = [0.55 + sh[0], 1.35 + sh[1], 2.2 - Math.min(t, 3.6) * 0.12], cl = [0.15, 1.0, -0.1];
+    place(C, [lerp(cp[0], 1.0, close), lerp(cp[1], 1.2, close), lerp(cp[2], 1.4, close)], [lerp(cl[0], 0.8, close), lerp(cl[1], 1.1, close), lerp(cl[2], 0.25, close)]);
     return { bloom: 0.5, exposure: 1.25, vignette: 0.42 };
   } };
 }

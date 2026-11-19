@@ -1,0 +1,50 @@
+{
+  "duration": 30.75,
+  "bpm": 96,
+  "key": "D",
+  "music": [
+    {"start": 0.0,   "end": 6.6,   "style": "mystery", "gain": 0.55},
+    {"start": 6.6,   "end": 7.7,   "style": "warm",    "gain": 0.45},
+    {"start": 7.7,   "end": 13.7,  "style": "tension", "gain": 0.6},
+    {"start": 13.7,  "end": 17.0,  "style": "drive",   "gain": 0.7},
+    {"start": 17.0,  "end": 19.9,  "style": "warm",    "gain": 0.5},
+    {"start": 20.0,  "end": 23.6,  "style": "dark",    "gain": 0.75},
+    {"start": 24.0,  "end": 27.4,  "style": "reveal",  "gain": 0.6},
+    {"start": 27.6,  "end": 30.75, "style": "mystery", "gain": 0.45}
+  ],
+  "ambience": [
+    {"start": 0.0,   "end": 7.7,   "type": "sea",   "gain": 0.45},
+    {"start": 0.0,   "end": 7.7,   "type": "wind",  "gain": 0.2},
+    {"start": 7.7,   "end": 17.0,  "type": "hold",  "gain": 0.5},
+    {"start": 17.0,  "end": 20.0,  "type": "sea",   "gain": 0.4},
+    {"start": 20.0,  "end": 23.95, "type": "storm", "gain": 0.65},
+    {"start": 23.95, "end": 30.75, "type": "room",  "gain": 0.3}
+  ],
+  "sfx": [
+    {"t": 3.2,   "type": "creak",   "gain": 0.6},
+    {"t": 6.6,   "type": "whoosh",  "gain": 0.8},
+    {"t": 6.75,  "type": "meow",    "gain": 0.7},
+    {"t": 7.7,   "type": "swish",   "gain": 0.7},
+    {"t": 8.0,   "type": "squeak",  "gain": 0.6},
+    {"t": 9.3,   "type": "squeak",  "gain": 0.5},
+    {"t": 10.8,  "type": "swish",   "gain": 0.6},
+    {"t": 11.2,  "type": "tick",    "gain": 0.7},
+    {"t": 11.5,  "type": "tick",    "gain": 0.7},
+    {"t": 12.6,  "type": "swish",   "gain": 0.6},
+    {"t": 14.05, "type": "whoosh",  "gain": 0.9},
+    {"t": 14.78, "type": "impact",  "gain": 0.9},
+    {"t": 14.85, "type": "squeak",  "gain": 0.7},
+    {"t": 15.0,  "type": "squeak",  "gain": 0.6},
+    {"t": 17.0,  "type": "whoosh",  "gain": 0.6},
+    {"t": 17.5,  "type": "purr",    "gain": 0.8},
+    {"t": 19.86, "type": "riser",   "gain": 0.5},
+    {"t": 20.9,  "type": "thunder", "gain": 1.0},
+    {"t": 21.3,  "type": "splash",  "gain": 0.6},
+    {"t": 22.4,  "type": "thunder", "gain": 0.9},
+    {"t": 23.95, "type": "swish",   "gain": 0.5},
+    {"t": 25.43, "type": "stamp",   "gain": 1.0},
+    {"t": 27.6,  "type": "pop",     "gain": 0.4},
+    {"t": 29.7,  "type": "meow",    "gain": 0.7}
+  ],
+  "silence": [[23.62, 23.98]]
+}

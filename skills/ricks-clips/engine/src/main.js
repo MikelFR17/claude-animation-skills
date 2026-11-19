@@ -4,7 +4,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { SHOTS, CAPTIONS, DURATION, FADES } from './shots.js';
+import * as EDIT from './shots.js';
+const { SHOTS, CAPTIONS, DURATION, FADES } = EDIT;
 import { MOODS, skyMaterial } from './world.js';
 import { CHAR } from './toon.js';
 
@@ -71,6 +72,55 @@ composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.addPass(grade);
 
+// ---------- captions ----------
+// CAPTIONS is a list of [start, token, end?] (a token is a word or a short group like "a cannonball").
+// CAPTION_STYLE (optional export of shots.js):
+//   mode 'group' (default): lines of up to maxWords words, broken at punctuation; the word being said lights up.
+//   mode 'word': one token at a time (the classic reel look).
+//   y: centre of the caption as a fraction of the frame height. Keep it at 0.62 or above the lower third (0.66),
+//   where the YouTube/Instagram UI sits. Wrap a word in *asterisks* to colour it (numbers, names, dates).
+const CS = { mode: 'group', maxWords: 4, maxChars: 24, y: 0.6, size: 52, color: '#ffffff', highlight: '#ffd23f', accent: '#ffd23f', ...(EDIT.CAPTION_STYLE || {}) };
+const bare = s => s.replace(/\*/g, '');
+const GROUPS = [];
+{
+  let cur = [];
+  const words = ids => ids.map(j => bare(CAPTIONS[j][1])).join(' ');
+  CAPTIONS.forEach((c, i) => {
+    if (cur.length) {
+      const next = words([...cur, i]);
+      if (next.split(/\s+/).length > CS.maxWords || next.length > CS.maxChars) { GROUPS.push(cur); cur = []; }
+    }
+    cur.push(i);
+    if (/[.,?!;:]$/.test(bare(c[1])) || c[2] != null) { GROUPS.push(cur); cur = []; }
+  });
+  if (cur.length) GROUPS.push(cur);
+}
+const groupOf = new Map(); GROUPS.forEach((g, k) => g.forEach(i => groupOf.set(i, k)));
+const esc = s => s.replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]));
+function tokenHTML(tok, state) {
+  return tok.split(/\s+/).map(w => {
+    const acc = /^\*.*\*[.,?!;:]?$/.test(w) || /^\*/.test(w);
+    const col = state === 'now' ? CS.highlight : acc ? CS.accent : CS.color;
+    return `<span style="color:${col}">${esc(bare(w))}</span>`;
+  }).join(' ');
+}
+function drawCaption(t) {
+  capEl.style.top = `${CS.y * 1280}px`; capEl.style.fontSize = `${CS.size}px`;
+  const i = CAPTIONS.findLastIndex(c => t >= c[0]);
+  const c = CAPTIONS[i];
+  const on = c && (c[2] == null || t < c[2]);
+  if (!on) { capEl.innerHTML = ''; return; }
+  let start = c[0], html;
+  if (CS.mode === 'word') html = tokenHTML(c[1], 'solo');
+  else {
+    const g = GROUPS[groupOf.get(i)]; start = CAPTIONS[g[0]][0];
+    html = g.map(j => tokenHTML(CAPTIONS[j][1], j === i ? 'now' : 'other')).join(' ');
+  }
+  capEl.innerHTML = html;
+  const age = t - start;
+  capEl.style.transform = `translateY(-50%) scale(${1 + 0.12 * Math.max(0, 1 - age / 0.1)})`;
+}
+
 // ---------- timeline ----------
 const capEl = document.getElementById('cap');
 const fadeEl = document.getElementById('fade');
@@ -103,13 +153,7 @@ window.renderAt = (t) => {
   grade.uniforms.uSat.value = r.saturation ?? 1.12;
   grade.uniforms.uTint.value.set(...(r.tint || [1, 1, 1]));
   composer.render();
-  // captions: 1-2 words, a small pop on each new word
-  const i = CAPTIONS.findLastIndex(c => t >= c[0]);
-  const c = CAPTIONS[i];
-  const on = c && (c[2] == null || t < c[2]);
-  capEl.textContent = on ? c[1] : '';
-  const age = on ? t - c[0] : 1;
-  capEl.style.transform = `scale(${1 + 0.14 * Math.max(0, 1 - age / 0.09)})`;
+  drawCaption(t);
   let f = 0;
   for (const [a, b, c2, d] of FADES) if (t >= a && t < d) f = Math.max(f, t < b ? (t - a) / (b - a) : t < c2 ? 1 : (d - t) / (d - c2));
   fadeEl.style.opacity = f;
