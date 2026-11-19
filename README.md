@@ -29,6 +29,14 @@ See them moving: **[novitckii.com/resources/animation-skills](https://novitckii.
 
 See them moving: **[novitckii.com/resources/animation-styles](https://novitckii.com/resources/animation-styles/)**
 
+### Story explainer in lit 3D sets (new)
+
+![Six frames from the ship-cat example: golden hour on deck, the cat, rats in the hold, a sick sailor, a sunset, a storm](docs/ricks-clips.jpg)
+
+| Skill | What it makes | Try it with |
+|---|---|---|
+| `/ricks-clips` | **A history/curiosity story short.** Flat cartoon people with white round heads, drawn faces and thick black outlines act in fully lit 3D sets: ship decks, dark holds, cabins. Golden hour, sunset, moonlit storms with lightning, lantern light and shafts of daylight. One word on screen at a time. Comes with a finished 28 s example, "Why every old ship had a cat". | `Why did sailors carry storm oil?` |
+
 ## Install
 
 You need macOS or Linux with **ffmpeg**, **Node.js 18+** and **Python 3.9+**.
@@ -71,11 +79,12 @@ Open Claude Code anywhere and ask:
 /minecraft build a tiny cottage block by block
 /kurzgesagt do all the planets fit between Earth and the Moon?
 /dan-koe one choice, then the next
+/ricks-clips why every old ship had a cat
 ```
 
 **The quick ones** (`/graph`, `/minimalistic-graphics`, `/map-route`, `/breakdown`, `/dan-koe`, `/kurzgesagt`, `/low-poly`, `/minecraft`) work from a small JSON spec. Claude writes `name.graph.json`, runs the skill's `build.py`, and you get `name.graph.mp4` (1080x1920, 30 fps) plus `name.graph.sheet.jpg`, a contact sheet with Instagram's safe area marked. The 2D ones render in about 10 seconds, the 3D ones in about 1.5 minutes.
 
-**The two engines** (`/stick-figure`, `/zach-d-films`, also called `/zach-3d-films`) are full explainer reels. Claude copies the example project, writes the script with you, makes or takes the voiceover, times every caption to it, writes the shots in code, checks stills, and renders. Plan on a working session, not one command.
+**The engines** (`/stick-figure`, `/zach-d-films`, also called `/zach-3d-films`, and `/ricks-clips`) are full explainer reels. Claude copies the example project, writes the script with you, makes or takes the voiceover, times every caption to it, writes the shots in code, checks stills, and renders. Plan on a working session, not one command.
 
 ## How it's built
 
@@ -85,6 +94,7 @@ skills/<name>/build.py          spec.json -> template.html -> HyperFrames -> mp4
 skills/<name>/template.html     the animation (GSAP, or three.js for the 3D ones)
 skills/stick-figure/engine/     canvas engine, voice + timing tools, make.sh, and the pirate reel as the template
 skills/zach-d-films/engine/     three.js engine (people, props, effects, renderer) and the armour short as the example
+skills/ricks-clips/engine/      three.js engine (flat outlined characters, lit sets, lighting moods, sea, weather) and the ship-cat short
 kit/anim.py                     shared: fill a template, render, snapshots, contact sheet
 kit/words.py                    word timings for a voiceover (Parakeet, on your computer)
 kit/setup.sh                    one-time setup
@@ -98,6 +108,6 @@ To add a quick skill, copy a folder like `skills/graph`, change `template.html` 
 - [three.js](https://threejs.org) draws the 3D, [GSAP](https://gsap.com) drives the 2D animation and [Playwright](https://playwright.dev) runs the engines' headless Chrome. They are installed at setup, not included here.
 - The free voice is [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) and the word timings come from NVIDIA's Parakeet through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx). The models are downloaded at setup, not included here.
 - The fonts are Inter, Inter Tight, Poppins, JetBrains Mono, Montserrat and Lora, all under the SIL Open Font License.
-- `/zach-d-films` is named after the style of short it makes. It isn't affiliated with Zack D. Films.
+- `/zach-d-films` and `/ricks-clips` are named after the style of short they make. They aren't affiliated with Zack D. Films or Rick's Clips.
 
 Made by [Artem Novitckii](https://novitckii.com). MIT licensed.
