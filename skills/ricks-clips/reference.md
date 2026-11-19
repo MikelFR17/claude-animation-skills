@@ -29,6 +29,7 @@ What the most-viewed shorts of this genre do, studied frame by frame from 14 of 
 - Characters stay fully readable in every light.
 
 ## Sets
+- **User preference: realistic backgrounds.** Build sets from realistic models and textures (Poly Haven) rather than cartoon or low-poly kits; only the characters are cartoon.
 - Every place is specific and busy: a mine with timber props, lanterns, tubs and gravel; a highway with a guard rail, trucks and grass verges; a station with a glass roof, banners and money bags.
 - Ground detail does a lot: gravel, individual rocks, grass that moves, plank seams, scattered props. In the engine: `pebbles()`, `grass()`, `crate`, `barrel`, `sack`, `ropeCoil`.
 - Props get outlines too (the pot, the ship rails, the barrels), so the set and the cast read as one style. Use `tmesh(..., { w })` for hero props.
