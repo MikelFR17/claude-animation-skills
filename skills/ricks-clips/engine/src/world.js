@@ -258,3 +258,60 @@ export function room({ w = 6, d = 6, h = 3, floorMat, wallMat, ceilMat, back = t
   if (ceilMat) { const c = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat); c.rotation.x = Math.PI / 2; c.position.y = h; g.add(c); }
   return g;
 }
+
+// ---------- scatter: grass that moves in the wind, gravel and pebbles ----------
+// grass({ w, d, count, h }) -> InstancedMesh centred on the origin; call .update(t) every frame for wind.
+export function grass({ w = 6, d = 6, count = 9000, h = 0.24, base = 0x3f8f2a, tip = 0xb9e46a, hole = null } = {}) {
+  const g = new THREE.BufferGeometry();
+  // one blade: a thin tapered quad bent forward a little
+  const P = [-0.012, 0, 0, 0.012, 0, 0, -0.006, 0.55, 0.02, 0.006, 0.55, 0.02, 0, 1, 0.06];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]);
+  const col = [], b = new THREE.Color(base), tp = new THREE.Color(tip);
+  for (let i = 0; i < 5; i++) { const y = P[i * 3 + 1], c = b.clone().lerp(tp, y); col.push(c.r, c.g, c.b); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
+  const uT = { value: 0 };
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uT = uT;
+    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      vec4 ip = instanceMatrix * vec4(0., 0., 0., 1.);
+      float sway = sin(uT * 1.8 + ip.x * 0.9 + ip.z * 0.6) * 0.5 + sin(uT * 3.1 + ip.x * 2.3) * 0.25;
+      transformed.x += sway * position.y * position.y * 0.35;
+      transformed.z += sway * position.y * position.y * 0.15;`);
+  };
+  const m = new THREE.InstancedMesh(g, mat, count);
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
+  let n = 0;
+  for (let i = 0; i < count * 3 && n < count; i++) {
+    v.set((rnd() - 0.5) * w, 0, (rnd() - 0.5) * d);
+    if (hole && hole(v.x, v.z)) continue;
+    e.set((rnd() - 0.5) * 0.4, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.4); q.setFromEuler(e);
+    const s = h * (0.55 + rnd() * 0.9); sc.set(s * (0.8 + rnd() * 0.6), s, s);
+    M.compose(v, q, sc); m.setMatrixAt(n, M);
+    c.setHSL(0.25 + (rnd() - 0.5) * 0.05, 0.55, 0.42 + rnd() * 0.18); m.setColorAt(n, c);
+    n++;
+  }
+  m.count = n; m.receiveShadow = true; m.castShadow = false;
+  m.update = t => { uT.value = t; };
+  return m;
+}
+// pebbles({ w, d, count, size }) -> chunky little stones (gravel beds, rail ballast, cave floors)
+export function pebbles({ w = 4, d = 4, count = 1500, size = 0.05, colors = [0x8a7f74, 0x6f655c, 0xa3968a, 0x7a5f4b, 0x5e5852], hole = null } = {}) {
+  const geo = new THREE.IcosahedronGeometry(1, 0);
+  const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), count);
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
+  let n = 0;
+  for (let i = 0; i < count * 3 && n < count; i++) {
+    v.set((rnd() - 0.5) * w, 0, (rnd() - 0.5) * d);
+    if (hole && hole(v.x, v.z)) continue;
+    const s = size * (0.4 + rnd() * 1.2); v.y = s * 0.25;
+    e.set(rnd() * 6, rnd() * 6, rnd() * 6); q.setFromEuler(e); sc.set(s * (0.8 + rnd() * 0.6), s * (0.5 + rnd() * 0.4), s * (0.8 + rnd() * 0.6));
+    M.compose(v, q, sc); m.setMatrixAt(n, M);
+    c.set(colors[Math.floor(rnd() * colors.length)]).multiplyScalar(0.85 + rnd() * 0.3); m.setColorAt(n, c);
+    n++;
+  }
+  m.count = n; m.castShadow = true; m.receiveShadow = true;
+  return m;
+}

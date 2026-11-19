@@ -6,6 +6,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import * as EDIT from './shots.js';
 const { SHOTS, CAPTIONS, DURATION, FADES } = EDIT;
+// TRANSITIONS (optional export of shots.js): [{ t, type, dur? }] centred on a cut at t.
+//   whip-left / whip-right / whip-up / whip-down : a fast pan blur that hides the cut (0.24 s)
+//   punch : a quick zoom-in into the new shot (0.2 s)      flash : a white pop (0.16 s)      blur : a soft radial dissolve (0.3 s)
+const TRANSITIONS = EDIT.TRANSITIONS || [];
 import { MOODS, skyMaterial } from './world.js';
 import { CHAR } from './toon.js';
 
@@ -67,10 +71,22 @@ const grade = new ShaderPass({
       c.rgb *= 1.0 - uVig * smoothstep(0.2, 0.62, length(q));
       gl_FragColor = vec4(clamp(c.rgb, 0., 1.), 1.); }`,
 });
+// transitions: directional motion blur + slide (whip), zoom punch, both centred on a cut
+const trans = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uDir: { value: new THREE.Vector2(0, 0) }, uZoom: { value: 1 }, uRad: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 uDir; uniform float uZoom, uRad; varying vec2 vUv;
+    void main(){ vec2 c = (vUv - 0.5) / uZoom + 0.5; vec4 acc = vec4(0.);
+      for (int i = 0; i < 32; i++) { float k = float(i) / 31. - 0.5;
+        vec2 p = c + uDir * k + (c - 0.5) * uRad * k;
+        acc += texture2D(tDiffuse, clamp(p, 0.001, 0.999)); }
+      gl_FragColor = acc / 32.; }`,
+});
 composer.addPass(renderPass);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.addPass(grade);
+composer.addPass(trans);
 
 // ---------- captions ----------
 // CAPTIONS is a list of [start, token, end?] (a token is a word or a short group like "a cannonball").
@@ -152,12 +168,27 @@ window.renderAt = (t) => {
   grade.uniforms.uVig.value = r.vignette ?? 0.32;
   grade.uniforms.uSat.value = r.saturation ?? 1.12;
   grade.uniforms.uTint.value.set(...(r.tint || [1, 1, 1]));
+  // transitions
+  let dir = [0, 0], zoom = 1, rad = 0, tflash = 0;
+  for (const tr of TRANSITIONS) {
+    const d = tr.dur ?? ({ punch: 0.2, flash: 0.16, blur: 0.3 }[tr.type] ?? 0.24), x = (t - tr.t) / (d / 2);
+    if (Math.abs(x) >= 1) continue;
+    const k = 1 - Math.abs(x), e = k * k * (3 - 2 * k);
+    if (tr.type.startsWith('whip')) {
+      const v = { 'whip-left': [-1, 0], 'whip-right': [1, 0], 'whip-up': [0, 1], 'whip-down': [0, -1] }[tr.type];
+      dir = [v[0] * 0.2 * e, v[1] * 0.14 * e];
+    } else if (tr.type === 'punch') { if (x > 0) zoom = 1 + 0.12 * (1 - x) ** 2; rad = 0.08 * e; }
+    else if (tr.type === 'flash') tflash = Math.max(tflash, e * 0.9);
+    else if (tr.type === 'blur') rad = 0.22 * e;
+  }
+  trans.enabled = dir[0] !== 0 || dir[1] !== 0 || zoom !== 1 || rad !== 0;
+  trans.uniforms.uDir.value.set(dir[0], dir[1]); trans.uniforms.uZoom.value = zoom; trans.uniforms.uRad.value = rad;
   composer.render();
   drawCaption(t);
   let f = 0;
   for (const [a, b, c2, d] of FADES) if (t >= a && t < d) f = Math.max(f, t < b ? (t - a) / (b - a) : t < c2 ? 1 : (d - t) / (d - c2));
   fadeEl.style.opacity = f;
-  flashEl.style.opacity = r.flash || 0;
+  flashEl.style.opacity = Math.max(r.flash || 0, tflash);
   hud.textContent = `t=${t.toFixed(2)} shot ${idx}`;
   return idx;
 };

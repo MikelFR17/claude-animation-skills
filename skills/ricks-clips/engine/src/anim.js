@@ -72,3 +72,32 @@ export function ikArm(h, side, target, pole, hint, a = 0.3, b = 0.335) {
   aimNegY(el, T.clone().sub(E), hint);
   wr.rotation.set(0, 0, 0); wr.updateMatrixWorld(true);
 }
+
+// ---------- camera recipes (the grammar of the reference shorts) ----------
+// shoot(camera, recipe, overrides) places a camera around a target. Recipes:
+//   hero    low and wide: camera at knee height, tilted up, the subject looms against the sky (the default)
+//   worm    worm's-eye: almost on the ground looking up, very wide (workers, giants, towers)
+//   ground  lens ~30 cm above the floor (raise it over sleepers, gravel, props), looking along it: rails, roads, decks
+//           run to a vanishing point
+//   dutch   hero with a 12-18° roll (tension, comedy, "something is off")
+//   insert  close and tighter, for props and reactions; put the prop near the lens
+//   wide    establishing shot, a bit high, the whole set and the light
+//   ots     over-the-shoulder: just behind and beside a foreground character
+// Overrides: target [x,y,z], dist, yaw (rad, 0 = camera on +z of the target), height (camera y), fov, roll, lookUp (aim offset y).
+export const RECIPES = {
+  hero:   { dist: 2.2, height: 0.55, fov: 62, roll: 0, lookUp: 0.15 },
+  worm:   { dist: 1.6, height: 0.12, fov: 74, roll: 0, lookUp: 0.35 },
+  ground: { dist: 2.6, height: 0.3, fov: 66, roll: 0, lookUp: 0.1 },
+  dutch:  { dist: 2.0, height: 0.6, fov: 60, roll: 0.26, lookUp: 0.1 },
+  insert: { dist: 0.9, height: null, fov: 44, roll: 0, lookUp: 0 },
+  wide:   { dist: 7.0, height: 2.6, fov: 58, roll: 0, lookUp: 0 },
+  ots:    { dist: 1.3, height: 1.25, fov: 52, roll: 0, lookUp: 0 },
+};
+export function shoot(c, recipe = 'hero', o = {}) {
+  const r = { ...RECIPES[recipe], ...o };
+  const tg = r.target || [0, 1, 0], yaw = r.yaw || 0;
+  const h = r.height == null ? tg[1] : r.height;
+  c.fov = r.fov; c.updateProjectionMatrix();
+  place(c, [tg[0] + Math.sin(yaw) * r.dist, h, tg[2] + Math.cos(yaw) * r.dist], [tg[0], tg[1] + (r.lookUp || 0), tg[2]], r.roll || 0);
+  return c;
+}

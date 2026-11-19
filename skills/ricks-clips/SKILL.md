@@ -49,6 +49,7 @@ Work as creative director, Shorts scriptwriter, fact researcher, virtual directo
 - If the topic is too broad, choose the most visual, concrete and surprising angle and say in one line why. Asked for "samurai and thunder", don't tell the history generically: find the single counter-intuitive detail, make it an immediate threat, build tension with concrete images and end on a reveal that recasts everything before it.
 
 ## Visual direction
+**Read `reference.md` before planning shots.** It holds the camera, composition, light and set grammar of the reference shorts: wide lenses close to the subject, low and ground-level cameras, dutch tilts, big foreground props, a spectacle wide for the payoff.
 - Every sentence has a visual reason. The video must work **without sound and without captions**.
 - Alternate wide, medium, macro detail and reaction/context shots. Cut every 1 to 3 s.
 - Subtle camera moves: slow push-in, short pan, parallax, gentle dolly, a shake only on impacts.
@@ -111,11 +112,11 @@ Needs ffmpeg, Node, and Python 3.9+ with numpy. Rendering uses WebGL in headless
 | File | What |
 |---|---|
 | `plan.md` | The 12-section plan (the example's). Copy it and replace everything. |
-| `src/shots.js` | **The edit.** `CAPTIONS` (`[start, token, end?]`; `*word*` highlights), `CAPTION_STYLE` (`mode: 'group'\|'word'`, `maxWords`, `maxChars`, `y`, `size`, `highlight`, `accent`), `FADES` (dips to black), `DURATION`, the cast, one function per shot and `SHOTS` (`{start, end, build}`). `build({makeStage})` returns `{scene, camera, update(t)}`; `update` may return `{exposure, bloom, bloomThreshold, vignette, saturation, tint:[r,g,b], flash, charLight:[lo,hi]}`. |
+| `src/shots.js` | **The edit.** `CAPTIONS` (`[start, token, end?]`; `*word*` highlights), `CAPTION_STYLE` (`mode: 'group'\|'word'`, `maxWords`, `maxChars`, `y`, `size`, `highlight`, `accent`), `FADES` (dips to black), `TRANSITIONS` (`[{t, type, dur?}]` centred on a cut: `whip-left` `whip-right` `whip-up` `whip-down` `punch` `flash` `blur`), `DURATION`, the cast, one function per shot and `SHOTS` (`{start, end, build}`). `build({makeStage})` returns `{scene, camera, update(t)}`; `update` may return `{exposure, bloom, bloomThreshold, vignette, saturation, tint:[r,g,b], flash, charLight:[lo,hi]}`. |
 | `src/toon.js` | **The cast.** `makeToon(outfit)` → `{root, setFace(f), pose(p), hands}`. Outfit: `color`, `stripes`, `lower`, `belt`, `buttons`, `double`, `tie`, `collar`, `coatOpen`, `sash`, `patch`, `hat` (`captain sailor beanie bandana tricorn tophat cowboy`), `hatColor`, `hair` (`bowl short bun bald`), `hairColor`, `skin`, `moustache`, `nose`, `epaulettes`, `size: [bodyW, bodyH, legLen]`, `scale`. Face: `eyes` (`open wide half sleepy closed happy dot red`), `brows` (`flat angry worried raised smug none`), `mouth` (`smile grin smirk flat frown wavy teeth o shout cat`), `open` 0–1, `look: [x, y]`, `sweat`, `blush`. Pose: `la`/`ra` `[out, forward, elbow]`, `ll`/`rl` `[forward, knee]`, `lean`, `turn`, `head`, `crouch`, `bob`; presets in `POSES`, `mixPose`, `walkPose`, `talk`, `blink`. Also `makeCat()` and `makeRat()`. |
-| `src/world.js` | **Sets and light.** `MOODS` (`day golden sunset night storm interior dark`): painted sky, clouds, sun glow, stars, moon. Textures `planks brick stone wallpaper canvasCloth` (+ `tex`). Set pieces `ship`, `sea` + `seaHeight`, `room`, `barrel crate sack ropeCoil rope box floor`, `lantern` (real light + glow + `flicker`), `beam` (light shaft), `dust`, `rain`, `glowSprite`. |
+| `src/world.js` | **Sets and light.** `MOODS` (`day golden sunset night storm interior dark`): painted sky, clouds, sun glow, stars, moon. Textures `planks brick stone wallpaper canvasCloth` (+ `tex`). Set pieces `ship`, `sea` + `seaHeight`, `room`, `barrel crate sack ropeCoil rope box floor`, `lantern` (real light + glow + `flicker`), `beam` (light shaft), `dust`, `rain`, `glowSprite`. Scatter: `grass({w, d, count, h, hole})` (instanced, wind via `.update(t)`) and `pebbles({w, d, count, size, hole})`. |
 | `src/main.js` | Renderer, `makeStage({mood, shadowSize, target, env, overrides})`, bloom, grade, captions, fades, lightning flash, `window.renderAt(t)`. |
-| `src/anim.js` | `kf`, easings, `range`, `cam(fov)`, `place(camera, pos, look, roll)`, `shake`. |
+| `src/anim.js` | `kf`, easings, `range`, `cam(fov)`, `place(camera, pos, look, roll)`, `shake`, and **`shoot(camera, recipe, {target, dist, yaw, height, fov, roll, lookUp})`** with recipes `hero` (low and wide, the default), `worm`, `ground`, `dutch`, `insert`, `wide`, `ots`. |
 | `sound.json`, `sound.py` | The cue sheet and the synthesiser (score, ambience, sfx, silences) → `audio/sound.wav`. |
 | `tts.py` | Free Kokoro voice in English or Spanish → `audio/vo_kokoro.wav` + `audio/lines.json`. |
 | `captions.py` | Timings → `CAPTIONS`: from `kit/words.py` (exact, English), `--lines audio/lines.json script.json` (any language) or `--estimate script.json` (no voice yet). |
@@ -135,6 +136,9 @@ Needs ffmpeg, Node, and Python 3.9+ with numpy. Rendering uses WebGL in headless
    - Dark scenes need practical lights: a `lantern` near the action (shadow on for one), a spotlight + `beam` + `dust` for a shaft of daylight, `hemi.intensity` around 0.9.
    - Lightning: a short `pulse` on the sun's intensity, `sky.material.uniforms.flash` and the returned `flash`/`exposure`.
    - The first frame (t = 0) is the thumbnail: frame it like one.
+   - Use `shoot()` recipes instead of hand-placing cameras: `hero` for most shots, `ground` along rails, roads and decks, `worm` for anyone powerful or high up, `dutch` on tense or comic beats, `wide` for the spectacle. Put a big prop near the lens in at least a third of the shots.
+   - Hide some cuts with `TRANSITIONS` (a whip on a change of place, a punch on a punchline, a flash on an impact). Keep most cuts hard.
+   - Ground detail: `pebbles()` on gravel and cave floors, `grass()` on verges and fields (keep `count` under ~30k), and outlines (`tmesh`) on hero props.
 6. **Sound.** Write `sound.json` from the plan's sound table (one music block per narrative block, ambience per location, a sfx on every cut and key action, a silence before the reveal), then `python3 sound.py`.
 7. **Stills.** `node render.mjs stills 0,1.5,5,9,13 stills` (add `GL=swiftshader` without a GPU). Look at every shot and fix framing, faces and light before a full render.
 8. **Render and mix.** `node render.mjs video silent.mp4 30`, then mix voice and sound (the bed ducks under the voice), level to -14 LUFS and scale to 1080x1920:
