@@ -143,8 +143,19 @@ export function glowSprite(color, size, opacity = 1) {
   s.scale.setScalar(size); return s;
 }
 // hanging oil lantern with a real warm light (shadows optional) and a glow
-export function lantern({ color = 0xffb35a, intensity = 6, dist = 7, shadow = false, chain = 0.3 } = {}) {
+// mesh: a loaded model to use instead of the built-in frame (e.g. model('lantern', { height: 0.35 })), centred on the flame
+export function lantern({ color = 0xffb35a, intensity = 6, dist = 7, shadow = false, chain = 0.3, mesh = null } = {}) {
   const g = new THREE.Group();
+  if (mesh) {
+    mesh.position.y -= 0.17; g.add(mesh);
+    if (chain) { const c = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, chain, 5), std(0x2a2420, { metalness: 0.5 }))); c.position.y = chain / 2 + 0.17; g.add(c); }
+    const light = new THREE.PointLight(color, intensity, dist, 1.6); light.position.y = -0.02; g.add(light);
+    if (shadow) { light.castShadow = true; light.shadow.mapSize.set(1024, 1024); light.shadow.bias = -0.002; light.shadow.radius = 4; light.shadow.camera.near = 0.2; }
+    const glow = glowSprite(color, 0.8, 0.5); g.add(glow);
+    g.userData = { light, glow, base: intensity };
+    g.flicker = t => { const k = 0.9 + 0.06 * Math.sin(t * 13) + 0.04 * Math.sin(t * 31); light.intensity = intensity * k; glow.material.opacity = 0.45 * k; };
+    return g;
+  }
   const frame = std(0x2a2420, { metalness: 0.5, roughness: 0.5 });
   if (chain) { const c = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, chain, 5), frame)); c.position.y = chain / 2 + 0.12; g.add(c); }
   g.add(box(0.15, 0.02, 0.15, frame, [0, 0.12, 0]), box(0.15, 0.02, 0.15, frame, [0, -0.12, 0]));

@@ -3,7 +3,7 @@
 // return { exposure, bloom, bloomThreshold, vignette, saturation, tint:[r,g,b], flash }.
 import * as THREE from 'three';
 import { makeToon, makeCat, makeRat, mixPose, walkPose, talk, blink, POSES, tmesh, toon } from './toon.js';
-import { ship, sea, seaHeight, wave, barrel, crate, sack, ropeCoil, rope, lantern, beam, dust, rain, room, box, floor,
+import { model, sea, seaHeight, sack, ropeCoil, rope, lantern, beam, dust, rain, room, box, floor,
   planks, wallpaper, stone, tex, std, glowSprite } from './world.js';
 import { kf, lerp, smooth, easeOut, easeIn, easeInOut, range, clamp, V, cam, place, shake } from './anim.js';
 
@@ -27,6 +27,18 @@ export const CAPTION_STYLE = { mode: 'group', maxWords: 4, maxChars: 18, y: 0.6 
 // [fadeInStart, fullStart, fullEnd, fadeOutEnd] dips to black
 export const FADES = [[19.86, 19.98, 20.02, 20.2]];
 
+// real CC0 models (python3 kit/assets.py model <id> / hdri <id>), loaded before the first frame
+const PH = 'assets/polyhaven/';
+export const ASSETS = {
+  ship: PH + 'dutch_ship_large_01/dutch_ship_large_01_1k.gltf', cannon: PH + 'cannon_01/cannon_01_1k.gltf',
+  barrel: PH + 'wine_barrel_01/wine_barrel_01_1k.gltf', barrel2: PH + 'barrel_03/barrel_03_1k.gltf', wine: PH + 'wine_barrel_01/wine_barrel_01_1k.gltf',
+  crate: PH + 'wooden_crate_01/wooden_crate_01_1k.gltf', crate2: PH + 'wooden_crate_02/wooden_crate_02_1k.gltf', chest: PH + 'treasure_chest/treasure_chest_1k.gltf',
+  lanternM: PH + 'Lantern_01/Lantern_01_1k.gltf', table: PH + 'WoodenTable_01/WoodenTable_01_1k.gltf', chair: PH + 'WoodenChair_01/WoodenChair_01_1k.gltf',
+  frame: PH + 'fancy_picture_frame_01/fancy_picture_frame_01_1k.gltf', shelf: PH + 'Shelf_01/Shelf_01_1k.gltf', candles: PH + 'brass_candleholders/brass_candleholders_1k.gltf',
+  skyGold: PH + 'hdri/belfast_sunset_puresky_1k.hdr', skyDusk: PH + 'hdri/qwantani_dusk_2_puresky_1k.hdr', skyStorm: PH + 'hdri/approaching_storm_1k.hdr',
+};
+const LANT = () => model('lanternM', { height: 0.38 });
+
 // ---------- cast ----------
 const SAILOR_A = { color: '#f4f1ea', stripes: '#22396b', lower: '#2c3e66', hat: 'bandana', hatColor: 0xb3261e, size: [0.44, 0.56, 0.5] };
 const SAILOR_B = { color: '#f4f1ea', stripes: '#22396b', lower: '#5a4632', hat: 'beanie', hatColor: 0x2f5d50, size: [0.5, 0.6, 0.48], moustache: true, nose: true };
@@ -45,21 +57,26 @@ function ride(g, t, amp = 1, z = 0) {
   g.rotation.x = Math.sin(t * 0.7 + 1) * 0.018 * amp;
 }
 function deckScene(makeStage, mood, { amp = 1, shadowSize = 4, target = [0, 0, 1] } = {}) {
-  const scene = makeStage({ mood, shadowSize, target });
+  const hdri = { golden: 'skyGold', sunset: 'skyDusk', storm: 'skyStorm' }[mood];
+  const scene = makeStage({ mood, shadowSize, target, hdri, env: 0.8 });
   const ocean = sea({ amp, color: mood === 'storm' ? 0x2a5a66 : mood === 'night' ? 0x1a3d73 : 0x2a7fb8, deep: mood === 'storm' ? 0x0c2228 : 0x0d3a66 });
-  ocean.position.y = -1.0; scene.add(ocean);
-  const S = ship(); scene.add(S.group);
-  return { scene, ocean, S };
+  ocean.position.y = -2.4; scene.add(ocean);
+  // the Poly Haven galleon: 34 m long, bow toward +z, main deck lifted to y = 0 (clear deck: |x| < 2.4, -3.5 < z < 4.5, mainmast at 0,0)
+  const group = new THREE.Group(); scene.add(group);
+  const hull = model('ship'); hull.rotation.y = Math.PI / 2; hull.position.y = -4.64; group.add(hull);
+  return { scene, ocean, S: { group } };
 }
 function deckClutter(g) {
-  const b1 = barrel(); b1.position.set(-1.05, 0, 2.6); g.add(b1);
-  const b2 = barrel({ h: 0.6, r: 0.22 }); b2.position.set(-1.2, 0, 3.15); g.add(b2);
-  const c1 = crate(0.55); c1.position.set(1.0, 0, 3.2); c1.rotation.y = 0.3; g.add(c1);
+  const put = (name, o, pos, ry = 0) => { const m = model(name, o); m.position.set(...pos); m.rotation.y = ry; g.add(m); return m; };
+  const b1 = put('barrel', { height: 0.75 }, [-1.05, 0, 1.6]);
+  const b2 = put('barrel2', { height: 0.62 }, [-1.35, 0, 2.25], 1);
+  put('wine', { height: 0.55 }, [-1.85, 0, 1.95], 0.4);
+  const c1 = put('crate', { height: 0.55 }, [1.25, 0, 3.3], 0.3);
+  put('crate2', { height: 0.45 }, [1.35, 0.55, 3.25], -0.2);
+  put('chest', { height: 0.5 }, [-1.9, 0, 0.6], 1.3);
+  put('cannon', { height: 0.75 }, [1.9, 0, -1.1], Math.PI / 2);
+  put('cannon', { height: 0.75 }, [-1.9, 0, -1.6], -Math.PI / 2);
   const coil = ropeCoil(); coil.position.set(0.9, 0, 1.9); g.add(coil);
-  const can = new THREE.Group();
-  const tube = tmesh(new THREE.CylinderGeometry(0.11, 0.15, 1.1, 18), std(0x2b2b30, { metalness: 0.7, roughness: 0.35 }), { w: 0.01 }); tube.rotation.x = Math.PI / 2; tube.position.set(0, 0.36, 0); can.add(tube);
-  const cart = box(0.42, 0.22, 0.7, std(0x7a4520), [0, 0.16, 0.15]); can.add(cart);
-  can.position.set(1.15, 0, -0.6); can.rotation.y = Math.PI / 2 - 0.15; g.add(can);
   return { b1, b2, c1 };
 }
 const haul = (t, s = 0) => { const k = Math.sin(t * 3.2 + s); return P(POSES.pull, { lean: [-0.25 - 0.12 * k, 0], la: [0.15, 1.25 + 0.15 * k, 0.4 - 0.2 * k], ra: [0.15, 1.1 - 0.15 * k, 0.55 + 0.2 * k], crouch: 0.03 + 0.02 * k }); };
@@ -68,7 +85,7 @@ const haul = (t, s = 0) => { const k = Math.sin(t * 3.2 + s); return P(POSES.pul
 function shotDeckWide({ makeStage }) {
   const { scene, ocean, S } = deckScene(makeStage, 'golden', { shadowSize: 5 });
   const g = S.group; deckClutter(g);
-  g.add(rope([-0.3, 7.2, -0.75], [-0.05, 0.95, 1.6], 0.2, 0.016));
+  g.add(rope([0.1, 11, 0.2], [-0.05, 0.95, 1.6], 0.3, 0.016));
   g.add(rope([-0.05, 0.95, 1.6], [0.0, 0.02, 3.6], 0.5, 0.016));
   const a = makeToon(SAILOR_A), b = makeToon(SAILOR_B), c = makeToon(SAILOR_C), cap = makeToon(CAPTAIN);
   a.root.position.set(0.25, 0, 1.75); b.root.position.set(0.28, 0, 2.45); c.root.position.set(0.3, 0, 3.05);
@@ -76,7 +93,7 @@ function shotDeckWide({ makeStage }) {
   cap.root.position.set(-0.85, 0, 0.6); cap.root.rotation.y = 0.9; g.add(cap.root);
   const C = cam(46);
   return { scene, camera: C, update(t) {
-    ocean.update(t + 3); ride(g, t + 3); wave(g.userData.flag, t);
+    ocean.update(t + 3); ride(g, t + 3);
     [a, b, c].forEach((s, i) => { s.pose(haul(t, i * 0.7)); s.setFace({ eyes: blink(t, i) ? 'closed' : 'open', brows: 'angry', mouth: 'teeth', sweat: i === 1 }); });
     cap.pose(P(POSES.hips, idle(t))); cap.setFace({ brows: 'smug', mouth: 'smirk', eyes: 'half', look: [0.5, 0] });
     place(C, [1.0 - t * 0.06, 1.2 + t * 0.03, -0.55 + t * 0.15], [0.05, 1.05, 2.4]);
@@ -88,14 +105,14 @@ function shotDeckWide({ makeStage }) {
 function shotHaul({ makeStage }) {
   const { scene, ocean, S } = deckScene(makeStage, 'golden', { shadowSize: 3, target: [0, 0, 2] });
   const g = S.group; deckClutter(g);
-  g.add(rope([-0.3, 7.2, -0.75], [-0.05, 0.95, 1.6], 0.2, 0.016));
+  g.add(rope([0.1, 11, 0.2], [-0.05, 0.95, 1.6], 0.3, 0.016));
   g.add(rope([-0.05, 0.95, 1.6], [0.0, 0.02, 3.6], 0.5, 0.016));
   const a = makeToon(SAILOR_A), b = makeToon(SAILOR_B);
   a.root.position.set(0.25, 0, 1.75); b.root.position.set(0.28, 0, 2.45);
   for (const s of [a, b]) { s.root.rotation.y = Math.PI * 0.92; g.add(s.root); }
   const C = cam(46);
   return { scene, camera: C, update(t) {
-    ocean.update(t + 6.2); ride(g, t + 6.2); wave(g.userData.flag, t);
+    ocean.update(t + 6.2); ride(g, t + 6.2);
     const stop = smooth(range(t, 1.3, 1.7));      // "never pulled a single rope" - they stop and look over
     [a, b].forEach((s, i) => {
       s.pose(mixPose(haul(t, i * 0.8), P(POSES.stand, { la: [0.2, 0.9, 0.6], ra: [0.2, 0.8, 0.7], head: [0, 0.3, 0], turn: 0.12 }), stop));
@@ -110,16 +127,16 @@ function shotHaul({ makeStage }) {
 
 // ============ 3. The cat: loafing on a barrel in the sun (6.6 - 7.7) ============
 function shotCatHero({ makeStage }) {
-  const { scene, ocean, S } = deckScene(makeStage, 'golden', { shadowSize: 2, target: [-1, 0.7, 2.6] });
+  const { scene, ocean, S } = deckScene(makeStage, 'golden', { shadowSize: 2, target: [-1, 0.7, 1.6] });
   const g = S.group; const { b1 } = deckClutter(g);
-  const cat = makeCat(); cat.root.position.set(-1.05, 0.75, 2.6); cat.root.rotation.y = 0.5; g.add(cat.root);
+  const cat = makeCat(); cat.root.position.set(-1.05, 0.76, 1.6); cat.root.rotation.y = 0.5; g.add(cat.root);
   cat.loaf(0.4);
   const C = cam(34);
   return { scene, camera: C, update(t) {
-    ocean.update(t + 9); ride(g, t + 9); wave(g.userData.flag, t);
+    ocean.update(t + 9); ride(g, t + 9);
     cat.tail(t, 0.7, 0.2); cat.neck.rotation.set(0, 0.25 + Math.sin(t * 0.8) * 0.05, 0.06);
     cat.setFace({ eyes: t > 0.55 && t < 0.68 ? 'closed' : 'half', look: [0.5, 0], brows: 'none' });
-    place(C, [-0.2 + t * 0.05, 1.0, 3.75 - t * 0.12], [-1.0, 0.98, 2.6]);
+    place(C, [-0.25 + t * 0.05, 1.0, 2.75 - t * 0.12], [-1.0, 0.98, 1.6]);
     return { bloom: 0.5 };
   } };
 }
@@ -138,12 +155,14 @@ function holdScene(makeStage) {
   scene.add(hatchLight, hatchLight.target);
   const shaft = beam({ len: 3.4, r0: 0.35, r1: 0.95, color: 0xbcd6ff, strength: 0.22 }); shaft.position.set(0.3, 2.65, -0.6); shaft.rotation.x = -0.27; scene.add(shaft);
   const motes = dust(60, [0.9, 2.0, 0.9]); motes.position.set(0.2, 1.2, -0.2); scene.add(motes);
-  const lamp = lantern({ intensity: 7, dist: 7, shadow: true, chain: 0.4 }); lamp.position.set(-1.3, 1.85, 0.6); scene.add(lamp);
-  const lamp2 = lantern({ intensity: 6, dist: 6, chain: 0.4 }); lamp2.position.set(1.4, 1.85, -2.2); scene.add(lamp2);
+  const lamp = lantern({ intensity: 7, dist: 7, shadow: true, chain: 0.4, mesh: LANT() }); lamp.position.set(-1.3, 1.85, 0.6); scene.add(lamp);
+  const lamp2 = lantern({ intensity: 6, dist: 6, chain: 0.4, mesh: LANT() }); lamp2.position.set(1.4, 1.85, -2.2); scene.add(lamp2);
   // cargo
   const props = new THREE.Group(); scene.add(props);
-  [[-2.2, -2.6], [-1.6, -2.9], [-2.5, -1.9]].forEach(([x, z], i) => { const b = barrel(); b.position.set(x, 0, z); b.rotation.y = i; props.add(b); });
-  [[2.1, -2.6, 0.7], [2.3, -1.7, 0.55], [2.1, -2.5, 0.5]].forEach(([x, z, s], i) => { const c = crate(s); c.position.set(x, i === 2 ? 0.7 : 0, z); c.rotation.y = i * 0.4; props.add(c); });
+  const put = (name, o, pos, ry = 0) => { const m = model(name, o); m.position.set(...pos); m.rotation.y = ry; props.add(m); return m; };
+  [[-2.2, -2.6, 'barrel'], [-1.55, -2.9, 'barrel2'], [-2.45, -1.85, 'wine'], [-2.5, -1.2, 'barrel']].forEach(([x, z, n], i) => put(n, { height: n === 'wine' ? 0.6 : 0.8 }, [x, 0, z], i));
+  put('chest', { height: 0.5 }, [-0.4, 0, -2.85], 0.2);
+  [[2.1, -2.6, 0.7, 'crate'], [2.3, -1.7, 0.55, 'crate2'], [2.1, -2.5, 0.5, 'crate2']].forEach(([x, z, s, n], i) => put(n, { height: s }, [x, i === 2 ? 0.7 : 0, z], i * 0.4));
   [[1.0, -2.8], [1.35, -2.5], [0.7, -2.4], [1.1, -2.2]].forEach(([x, z], i) => { const s = sack(); s.position.set(x, 0, z); s.rotation.y = i * 1.3; props.add(s); });
   return { scene, lamp, motes, shaft, props };
 }
@@ -190,7 +209,7 @@ function shotChew({ makeStage }) {
 // ============ 6. A sick sailor slumped on a crate (12.6 - 13.7) ============
 function shotSick({ makeStage }) {
   const H = holdScene(makeStage); const { scene, lamp, motes } = H;
-  const seat = crate(0.45); seat.position.set(-0.4, 0, -0.5); scene.add(seat);
+  const seat = model('crate', { height: 0.45 }); seat.position.set(-0.4, 0, -0.5); scene.add(seat);
   const guy = makeToon({ ...SAILOR_C, skin: 0xc8e6a0 }); guy.root.position.set(-0.4, 0.45 - 0.5 * 0.52, -0.42); guy.root.rotation.y = 0.35; scene.add(guy.root);
   const C = cam(36);
   return { scene, camera: C, update(t) {
@@ -239,19 +258,19 @@ function shotPounce({ makeStage }) {
 
 // ============ 8. Sunset: a sailor pets the cat (17.0 - 19.98) ============
 function shotLuck({ makeStage }) {
-  const { scene, ocean, S } = deckScene(makeStage, 'sunset', { shadowSize: 2.5, target: [0.6, 0, 2] });
+  const { scene, ocean, S } = deckScene(makeStage, 'sunset', { shadowSize: 2.5, target: [0.6, 0, 1.2] });
   const g = S.group;
-  const cat = makeCat(); cat.root.position.set(0.8, 0, 2.3); cat.root.rotation.y = 0.1; g.add(cat.root); cat.sit(1);
-  const man = makeToon(SAILOR_B); man.root.position.set(0.25, 0, 2.3); man.root.rotation.y = 1.2; g.add(man.root);
+  const cat = makeCat(); cat.root.position.set(0.8, 0, 1.3); cat.root.rotation.y = 0.1; g.add(cat.root); cat.sit(1);
+  const man = makeToon(SAILOR_B); man.root.position.set(0.25, 0, 1.3); man.root.rotation.y = 1.2; g.add(man.root);
   const C = cam(38);
   return { scene, camera: C, update(t) {
-    ocean.update(t + 20); ride(g, t + 20, 0.8); wave(g.userData.flag, t);
+    ocean.update(t + 20); ride(g, t + 20, 0.8);
     const k = Math.sin(t * 4.2);
     man.pose(P(POSES.pet, { crouch: 0.16, lean: [0.2, 0], ll: [0.9, 1.5], rl: [0.3, 1.0], ra: [0.15, 1.05 + 0.12 * k, 0.5], la: [0.5, 0.3, 1.5], head: [-0.05, 0.2, 0] }));
     man.setFace({ eyes: 'happy', brows: 'raised', mouth: 'smile', open: talk(t, t > 0.4 && t < 1.6) * 0.6 });
     cat.neck.rotation.set(-0.15 + k * 0.06, 0.25, 0.1); cat.tail(t, 0.6, 0.9);
     cat.setFace({ eyes: 'happy', mouth: 'cat', blush: true });
-    place(C, [1.9 - t * 0.05, 1.3, 4.2 - t * 0.08], [0.5, 0.55, 2.2]);
+    place(C, [1.9 - t * 0.05, 1.3, 3.2 - t * 0.08], [0.5, 0.55, 1.2]);
     return { bloom: 0.6, exposure: 1.0 };
   } };
 }
@@ -260,8 +279,8 @@ function shotLuck({ makeStage }) {
 function shotOverboard({ makeStage }) {
   const { scene, ocean, S } = deckScene(makeStage, 'storm', { amp: 2.2, shadowSize: 3, target: [1, 0, 1] });
   const g = S.group;
-  const man = makeToon(SAILOR_A); man.root.position.set(1.15, 0, 0.2); man.root.rotation.y = Math.PI / 2 + 0.3; g.add(man.root);
-  const lamp = lantern({ intensity: 7, dist: 6, shadow: true, chain: 0.35 }); lamp.position.set(0.2, 2.0, -0.4); g.add(lamp);
+  const man = makeToon(SAILOR_A); man.root.position.set(2.2, 0, 0.9); man.root.rotation.y = Math.PI / 2 + 0.3; g.add(man.root);
+  const lamp = lantern({ intensity: 7, dist: 6, shadow: true, chain: 0.35, mesh: LANT() }); lamp.position.set(1.2, 2.0, 0.4); g.add(lamp);
   const wet = rain(1800, [14, 10, 14], 16); wet.position.set(0, -2, 0); scene.add(wet);
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 32), new THREE.MeshBasicMaterial({ color: 0xdff2ff, transparent: true, depthWrite: false })); ring.rotation.x = -Math.PI / 2; scene.add(ring);
   const sun = scene.userData.sun, sky = scene.userData.sky;
@@ -270,11 +289,11 @@ function shotOverboard({ makeStage }) {
     ocean.update(t + 30); ride(g, t + 30, 2.2); lamp.rotation.z = Math.sin(t * 2.2) * 0.25 - g.rotation.z; lamp.flicker(t); wet.update(t);
     const fl = Math.max(pulse(t, 0.95, 0.05), pulse(t, 1.15, 0.07) * 0.7);
     sun.intensity = 1.2 + fl * 9; sky.material.uniforms.flash.value = fl * 0.7;
-    const rk = range(t, 0.2, 1.9); ring.position.set(3.2, -0.9 + seaHeight(3.2, 0.6, t + 30, 2.2), 0.6); ring.scale.setScalar(0.5 + rk * 2.5); ring.material.opacity = (1 - rk) * 0.9;
+    const rk = range(t, 0.2, 1.9); ring.position.set(5.2, -2.3 + seaHeight(5.2, 1.0, t + 30, 2.2), 1.2); ring.scale.setScalar(0.5 + rk * 2.5); ring.material.opacity = (1 - rk) * 0.9;
     man.pose(P(POSES.scared, { lean: [0.15, -0.1], head: [0.12, 0, 0], la: [0.6, 1.2, 0.6], ra: [0.6, 1.0, 0.8] }));
     man.setFace({ eyes: 'wide', brows: 'worried', mouth: 'o', look: [0, 0.75], sweat: true });
     const sh = shake(t, 2, 7);
-    place(C, [2.7 + sh[0], 1.55 + sh[1], 1.1], [1.1, 1.05, 0.15], g.rotation.z * 0.5);
+    place(C, [3.7 + sh[0], 1.6 + sh[1], 2.0], [2.15, 1.05, 0.85], g.rotation.z * 0.5);
     return { bloom: 0.55, exposure: 1.1 + fl * 0.6, vignette: 0.42, flash: fl * 0.35 };
   } };
 }
@@ -283,8 +302,8 @@ function shotOverboard({ makeStage }) {
 function shotStormWide({ makeStage }) {
   const { scene, ocean, S } = deckScene(makeStage, 'storm', { amp: 3, shadowSize: 8, target: [0, 0, 0] });
   const g = S.group;
-  const lamp = lantern({ intensity: 9, dist: 8, chain: 0.35 }); lamp.position.set(0.2, 2.0, 0.6); g.add(lamp);
-  const lamp2 = lantern({ intensity: 6, dist: 6, chain: 0 }); lamp2.position.set(0, 1.0, 4.4); g.add(lamp2);
+  const lamp = lantern({ intensity: 9, dist: 8, chain: 0.35, mesh: LANT() }); lamp.position.set(1.2, 2.0, 0.6); g.add(lamp);
+  const lamp2 = lantern({ intensity: 8, dist: 8, chain: 0, mesh: LANT() }); lamp2.position.set(0, 3.6, -8); g.add(lamp2);
   const wet = rain(2500, [30, 16, 30], 18); wet.position.set(0, -3, 0); scene.add(wet);
   const bolt = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([[-9, 22, -30], [-7, 16, -29], [-10, 11, -30], [-8, 5, -29], [-9.5, -1, -30]].map(p => new THREE.Vector3(...p))), 30, 0.12, 5), new THREE.MeshBasicMaterial({ color: 0xeaf4ff }));
   scene.add(bolt);
@@ -296,7 +315,7 @@ function shotStormWide({ makeStage }) {
     const fl = Math.max(pulse(t, 0.45, 0.05), pulse(t, 0.62, 0.06) * 0.8);
     bolt.visible = fl > 0.25;
     sun.intensity = 1.2 + fl * 10; sky.material.uniforms.flash.value = fl * 0.8;
-    place(C, [9 - t * 0.4, 2.4, 11 - t * 0.3], [0, 2.2, -1]);
+    place(C, [24 - t * 0.8, 5, 28 - t * 0.6], [0, 5, 0]);
     return { bloom: 0.6, exposure: 1.05 + fl * 0.5, vignette: 0.42, flash: fl * 0.3 };
   } };
 }
@@ -323,8 +342,14 @@ function shotOrder({ makeStage }) {
   const day = new THREE.SpotLight(0xcfe2ff, 25, 9, 0.35, 0.6, 1.2); day.position.set(1.4, 1.9, -2.6); day.target.position.set(0.3, 0.7, 0.6); day.castShadow = true; day.shadow.mapSize.set(1024, 1024); scene.add(day, day.target);
   const shaft = beam({ len: 4, r0: 0.4, r1: 1.0, color: 0xcfe2ff, strength: 0.06 }); shaft.position.set(1.4, 1.85, -2.9); shaft.rotation.x = -1.2; shaft.rotation.z = 0.25; scene.add(shaft);
   // portrait
-  const frame = box(0.8, 1.0, 0.05, std(0xb08a3a, { metalness: 0.6, roughness: 0.35 }), [-1.3, 1.9, -2.94]); R.add(frame);
-  const pic = new THREE.Mesh(new THREE.PlaneGeometry(0.66, 0.86), std(0x3a5070)); pic.position.set(-1.3, 1.9, -2.91); R.add(pic);
+  const put = (name, o, pos, ry = 0) => { const m = model(name, o); m.position.set(...pos); m.rotation.y = ry; scene.add(m); return m; };
+  put('frame', { height: 0.95 }, [-1.3, 1.45, -2.93]);
+  put('shelf', { height: 1.9 }, [-2.45, 0, -2.4], Math.PI / 2);
+  put('chair', { height: 0.95 }, [0.05, 0, -1.25], 0);
+  put('chest', { height: 0.5 }, [2.2, 0, -2.4], -0.4);
+  put('barrel', { height: 0.8 }, [-2.3, 0, 0.4]);
+  put('candles', { height: 0.3 }, [0.6, 0.84, -0.32]);
+  const hang = lantern({ intensity: 2.5, dist: 5, chain: 0.5, mesh: LANT() }); hang.position.set(1.6, 2.3, -1.4); scene.add(hang);
   // desk
   const desk = new THREE.Group(); scene.add(desk);
   desk.add(box(2.2, 0.08, 1.0, std(0xffffff, { map: tex(planks(0x6a3a1c, 5), 1, 1) }), [0, 0.8, 0]));
