@@ -334,7 +334,7 @@ export function walkPose(phase, amt = 1, extra = {}) {
 }
 // talking: mouth open from a time, a rate and a seed
 export const talk = (t, on = 1, seed = 0) => on ? clamp(0.5 + 0.5 * Math.sin(t * 17 + seed) * Math.sin(t * 5.3 + seed * 2), 0, 1) : 0;
-export const blink = (t, seed = 0) => ((t + seed * 1.37) % 3.1) < 0.12;
+export const blink = (t, seed = 0) => ((t + seed * 1.37 + 1.4) % 3.1) < 0.12;   // never at t = 0: the first frame is the thumbnail
 
 // ---------- a cat in the same style ----------
 export function makeCat(o = {}) {
