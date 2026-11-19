@@ -35,7 +35,7 @@ See them moving: **[novitckii.com/resources/animation-styles](https://novitckii.
 
 | Skill | What it makes | Try it with |
 |---|---|---|
-| `/ricks-clips` | **A history/curiosity story short.** Flat cartoon people with white round heads, drawn faces and thick black outlines act in fully lit 3D sets: ship decks, dark holds, cabins. Golden hour, sunset, moonlit storms with lightning, lantern light and shafts of daylight. One word on screen at a time. Comes with a finished 28 s example, "Why every old ship had a cat". | `Why did sailors carry storm oil?` |
+| `/ricks-clips` | **A cinematic history, science or experiment Short, from research to mp4.** Claude researches the facts and writes a full production plan (title, 2-second hook, timed script, shot list, captions, sound design, AI image prompts, sources with certainty levels, A/B hooks, QC checklist). It then renders the Short: flat cartoon people with thick black outlines act in fully lit 3D sets (golden hour, sunset, storms with lightning, lantern light, shafts of daylight), with grouped captions above the lower third and a score, ambience and sound effects synthesised in code. English or Spanish voice. Comes with a finished 31 s example, "Why Every Old Ship Had a Cat", and its plan. | `Why did sailors carry storm oil?` |
 
 ## Install
 
@@ -94,7 +94,8 @@ skills/<name>/build.py          spec.json -> template.html -> HyperFrames -> mp4
 skills/<name>/template.html     the animation (GSAP, or three.js for the 3D ones)
 skills/stick-figure/engine/     canvas engine, voice + timing tools, make.sh, and the pirate reel as the template
 skills/zach-d-films/engine/     three.js engine (people, props, effects, renderer) and the armour short as the example
-skills/ricks-clips/engine/      three.js engine (flat outlined characters, lit sets, lighting moods, sea, weather) and the ship-cat short
+skills/ricks-clips/engine/      three.js engine (flat outlined characters, lit sets, lighting moods, sea, weather), sound synthesiser,
+                                and the ship-cat short with its production plan (plan.md)
 kit/anim.py                     shared: fill a template, render, snapshots, contact sheet
 kit/words.py                    word timings for a voiceover (Parakeet, on your computer)
 kit/setup.sh                    one-time setup
