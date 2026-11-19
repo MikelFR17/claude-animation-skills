@@ -143,8 +143,19 @@ export function glowSprite(color, size, opacity = 1) {
   s.scale.setScalar(size); return s;
 }
 // hanging oil lantern with a real warm light (shadows optional) and a glow
-export function lantern({ color = 0xffb35a, intensity = 6, dist = 7, shadow = false, chain = 0.3 } = {}) {
+// mesh: a loaded model to use instead of the built-in frame (e.g. model('lantern', { height: 0.35 })), centred on the flame
+export function lantern({ color = 0xffb35a, intensity = 6, dist = 7, shadow = false, chain = 0.3, mesh = null } = {}) {
   const g = new THREE.Group();
+  if (mesh) {
+    mesh.position.y -= 0.17; g.add(mesh);
+    if (chain) { const c = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, chain, 5), std(0x2a2420, { metalness: 0.5 }))); c.position.y = chain / 2 + 0.17; g.add(c); }
+    const light = new THREE.PointLight(color, intensity, dist, 1.6); light.position.y = -0.02; g.add(light);
+    if (shadow) { light.castShadow = true; light.shadow.mapSize.set(1024, 1024); light.shadow.bias = -0.002; light.shadow.radius = 4; light.shadow.camera.near = 0.2; }
+    const glow = glowSprite(color, 0.8, 0.5); g.add(glow);
+    g.userData = { light, glow, base: intensity };
+    g.flicker = t => { const k = 0.9 + 0.06 * Math.sin(t * 13) + 0.04 * Math.sin(t * 31); light.intensity = intensity * k; glow.material.opacity = 0.45 * k; };
+    return g;
+  }
   const frame = std(0x2a2420, { metalness: 0.5, roughness: 0.5 });
   if (chain) { const c = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, chain, 5), frame)); c.position.y = chain / 2 + 0.12; g.add(c); }
   g.add(box(0.15, 0.02, 0.15, frame, [0, 0.12, 0]), box(0.15, 0.02, 0.15, frame, [0, -0.12, 0]));
@@ -256,5 +267,139 @@ export function room({ w = 6, d = 6, h = 3, floorMat, wallMat, ceilMat, back = t
   if (left) wall(d, [-w / 2, h / 2, 0], Math.PI / 2);
   if (right) wall(d, [w / 2, h / 2, 0], -Math.PI / 2);
   if (ceilMat) { const c = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat); c.rotation.x = Math.PI / 2; c.position.y = h; g.add(c); }
+  return g;
+}
+
+// ---------- scatter: grass that moves in the wind, gravel and pebbles ----------
+// grass({ w, d, count, h }) -> InstancedMesh centred on the origin; call .update(t) every frame for wind.
+export function grass({ w = 6, d = 6, count = 9000, h = 0.24, base = 0x3f8f2a, tip = 0xb9e46a, hole = null } = {}) {
+  const g = new THREE.BufferGeometry();
+  // one blade: a thin tapered quad bent forward a little
+  const P = [-0.012, 0, 0, 0.012, 0, 0, -0.006, 0.55, 0.02, 0.006, 0.55, 0.02, 0, 1, 0.06];
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+  g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]);
+  const col = [], b = new THREE.Color(base), tp = new THREE.Color(tip);
+  for (let i = 0; i < 5; i++) { const y = P[i * 3 + 1], c = b.clone().lerp(tp, y); col.push(c.r, c.g, c.b); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
+  const uT = { value: 0 };
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uT = uT;
+    sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      vec4 ip = instanceMatrix * vec4(0., 0., 0., 1.);
+      float sway = sin(uT * 1.8 + ip.x * 0.9 + ip.z * 0.6) * 0.5 + sin(uT * 3.1 + ip.x * 2.3) * 0.25;
+      transformed.x += sway * position.y * position.y * 0.35;
+      transformed.z += sway * position.y * position.y * 0.15;`);
+  };
+  const m = new THREE.InstancedMesh(g, mat, count);
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
+  let n = 0;
+  for (let i = 0; i < count * 3 && n < count; i++) {
+    v.set((rnd() - 0.5) * w, 0, (rnd() - 0.5) * d);
+    if (hole && hole(v.x, v.z)) continue;
+    e.set((rnd() - 0.5) * 0.4, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.4); q.setFromEuler(e);
+    const s = h * (0.55 + rnd() * 0.9); sc.set(s * (0.8 + rnd() * 0.6), s, s);
+    M.compose(v, q, sc); m.setMatrixAt(n, M);
+    c.setHSL(0.25 + (rnd() - 0.5) * 0.05, 0.55, 0.42 + rnd() * 0.18); m.setColorAt(n, c);
+    n++;
+  }
+  m.count = n; m.receiveShadow = true; m.castShadow = false;
+  m.update = t => { uT.value = t; };
+  return m;
+}
+// pebbles({ w, d, count, size }) -> chunky little stones (gravel beds, rail ballast, cave floors)
+export function pebbles({ w = 4, d = 4, count = 1500, size = 0.05, colors = [0x8a7f74, 0x6f655c, 0xa3968a, 0x7a5f4b, 0x5e5852], hole = null } = {}) {
+  const geo = new THREE.IcosahedronGeometry(1, 0);
+  const m = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), count);
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3(), c = new THREE.Color();
+  let n = 0;
+  for (let i = 0; i < count * 3 && n < count; i++) {
+    v.set((rnd() - 0.5) * w, 0, (rnd() - 0.5) * d);
+    if (hole && hole(v.x, v.z)) continue;
+    const s = size * (0.4 + rnd() * 1.2); v.y = s * 0.25;
+    e.set(rnd() * 6, rnd() * 6, rnd() * 6); q.setFromEuler(e); sc.set(s * (0.8 + rnd() * 0.6), s * (0.5 + rnd() * 0.4), s * (0.8 + rnd() * 0.6));
+    M.compose(v, q, sc); m.setMatrixAt(n, M);
+    c.set(colors[Math.floor(rnd() * colors.length)]).multiplyScalar(0.85 + rnd() * 0.3); m.setColorAt(n, c);
+    n++;
+  }
+  m.count = n; m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+// ---------- bursts: money, confetti, leaves, debris thrown into the air (deterministic in t) ----------
+// burst({ kind: 'bills'|'confetti'|'debris', count, origin, t0, speed, spread, up, gravity, size }) -> InstancedMesh;
+// call .update(t) every frame (t in the shot's time). Thrown at t0 from origin, tumbling, falling, landing on y=0.
+const billTex = () => cached('bill', () => canvas(128, 64, (g, w, h) => {
+  g.fillStyle = '#7fbf6a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#2f6b3a'; g.lineWidth = 5; g.strokeRect(4, 4, w - 8, h - 8);
+  g.fillStyle = '#cfe8b8'; g.beginPath(); g.ellipse(w / 2, h / 2, 16, 18, 0, 0, 7); g.fill(); g.fillStyle = '#2f6b3a'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.fillText('$', w / 2, h / 2 + 9);
+}));
+export function burst({ kind = 'bills', count = 400, origin = [0, 0.5, 0], t0 = 0, speed = 4, spread = 1.2, up = 1, gravity = 3.5, size = 0.12 } = {}) {
+  const geo = kind === 'debris' ? new THREE.IcosahedronGeometry(1, 0) : new THREE.PlaneGeometry(1, kind === 'bills' ? 0.5 : 0.6);
+  const mat = kind === 'bills' ? new THREE.MeshStandardMaterial({ map: billTex(), side: THREE.DoubleSide, roughness: 0.8 })
+    : new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.7, flatShading: kind === 'debris' });
+  const m = new THREE.InstancedMesh(geo, mat, count);
+  const P = [], c = new THREE.Color(), pal = kind === 'confetti' ? [0xff4d6d, 0xffd23f, 0x3ec1d3, 0x8f6bff, 0x5be37d] : [0x8a7f74, 0x6f655c, 0xa3968a];
+  for (let i = 0; i < count; i++) {
+    const a = rnd() * Math.PI * 2, el = (rnd() * 0.9 + 0.1) * up, v = speed * (0.4 + rnd() * 0.8);
+    P.push({ v: [Math.cos(a) * spread * v * (1 - el * 0.5), el * v, Math.sin(a) * spread * v * (1 - el * 0.5)], spin: [rnd() * 8 - 4, rnd() * 8 - 4, rnd() * 8 - 4], s: size * (0.6 + rnd() * 0.8), delay: rnd() * 0.15 });
+    if (kind !== 'bills') { c.set(pal[i % pal.length]); m.setColorAt(i, c); }
+  }
+  m.castShadow = true; m.frustumCulled = false;
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  m.update = t => {
+    for (let i = 0; i < count; i++) {
+      const o = P[i], tt = Math.max(0, t - t0 - o.delay);
+      const drag = kind === 'debris' ? 1 : 0.55;   // paper flutters down slower
+      p.set(origin[0] + o.v[0] * tt * drag, origin[1] + o.v[1] * tt - 0.5 * gravity * drag * tt * tt, origin[2] + o.v[2] * tt * drag);
+      const landed = p.y <= 0.01; if (landed) p.y = 0.01;
+      const flut = landed ? 0 : tt;
+      e.set(o.spin[0] * flut + (landed ? Math.PI / 2 : 0), o.spin[1] * flut, o.spin[2] * flut); q.setFromEuler(e);
+      sc.setScalar(t < t0 ? 0 : o.s); M.compose(p, q, sc); m.setMatrixAt(i, M);
+    }
+    m.instanceMatrix.needsUpdate = true;
+  };
+  m.update(0);
+  return m;
+}
+
+// ---------- real models (glTF/GLB) and HDRI skies ----------
+// List what a short uses in shots.js:   export const ASSETS = { sedan: 'assets/kenney/car-kit/sedan.glb', sky: 'assets/polyhaven/hdri/x_1k.hdr' }
+// main.js loads them all before the first frame; then model('sedan', {...}) returns a fresh copy, synchronously,
+// and makeStage({ hdri: 'sky' }) lights the scene with that sky.
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
+export const LOADED = { models: {}, hdri: {} };
+export async function preload(map = {}) {
+  const gl = new GLTFLoader(), rg = new RGBELoader();
+  await Promise.all(Object.entries(map).map(async ([name, path]) => {
+    try {
+      if (/\.hdr$/i.test(path)) { const t = await rg.loadAsync(path); t.mapping = THREE.EquirectangularReflectionMapping; LOADED.hdri[name] = t; }
+      else LOADED.models[name] = (await gl.loadAsync(path)).scene;
+    } catch (e) { console.error(`asset "${name}" (${path}) failed to load: ${e.message || e}`); }
+  }));
+}
+// model(name, { scale, height, outline, color, shadows }) -> a copy of a loaded model.
+//   height: scale it so it is this many metres tall (handy across kits);  outline: ink width (e.g. 0.008) to match the cast;
+//   color: tint every material;  the model stands on y=0, centred on x/z.
+export function model(name, o = {}) {
+  const src = LOADED.models[name];
+  if (!src) { console.error(`model "${name}" is not in ASSETS`); return new THREE.Group(); }
+  const m = skeletonClone(src);
+  const g = new THREE.Group(); g.add(m);
+  m.traverse(c => {
+    if (!c.isMesh) return;
+    c.castShadow = o.shadows ?? true; c.receiveShadow = true;
+    c.material = c.material.clone();
+    if (o.color != null) c.material.color = new THREE.Color(o.color);
+    if (o.rough != null) c.material.roughness = o.rough;
+  });
+  const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3());
+  const s = o.height ? o.height / Math.max(size.y, 1e-6) : (o.scale ?? 1);
+  m.scale.setScalar(s);
+  const b2 = new THREE.Box3().setFromObject(m), c2 = b2.getCenter(new THREE.Vector3());
+  m.position.set(-c2.x, -b2.min.y, -c2.z);
+  if (o.outline) m.traverse(c => { if (c.isMesh && !c.userData.isOutline) outline(c, o.outline); });
   return g;
 }
