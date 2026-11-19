@@ -315,3 +315,39 @@ export function pebbles({ w = 4, d = 4, count = 1500, size = 0.05, colors = [0x8
   m.count = n; m.castShadow = true; m.receiveShadow = true;
   return m;
 }
+
+// ---------- bursts: money, confetti, leaves, debris thrown into the air (deterministic in t) ----------
+// burst({ kind: 'bills'|'confetti'|'debris', count, origin, t0, speed, spread, up, gravity, size }) -> InstancedMesh;
+// call .update(t) every frame (t in the shot's time). Thrown at t0 from origin, tumbling, falling, landing on y=0.
+const billTex = () => cached('bill', () => canvas(128, 64, (g, w, h) => {
+  g.fillStyle = '#7fbf6a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#2f6b3a'; g.lineWidth = 5; g.strokeRect(4, 4, w - 8, h - 8);
+  g.fillStyle = '#cfe8b8'; g.beginPath(); g.ellipse(w / 2, h / 2, 16, 18, 0, 0, 7); g.fill(); g.fillStyle = '#2f6b3a'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.fillText('$', w / 2, h / 2 + 9);
+}));
+export function burst({ kind = 'bills', count = 400, origin = [0, 0.5, 0], t0 = 0, speed = 4, spread = 1.2, up = 1, gravity = 3.5, size = 0.12 } = {}) {
+  const geo = kind === 'debris' ? new THREE.IcosahedronGeometry(1, 0) : new THREE.PlaneGeometry(1, kind === 'bills' ? 0.5 : 0.6);
+  const mat = kind === 'bills' ? new THREE.MeshStandardMaterial({ map: billTex(), side: THREE.DoubleSide, roughness: 0.8 })
+    : new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.7, flatShading: kind === 'debris' });
+  const m = new THREE.InstancedMesh(geo, mat, count);
+  const P = [], c = new THREE.Color(), pal = kind === 'confetti' ? [0xff4d6d, 0xffd23f, 0x3ec1d3, 0x8f6bff, 0x5be37d] : [0x8a7f74, 0x6f655c, 0xa3968a];
+  for (let i = 0; i < count; i++) {
+    const a = rnd() * Math.PI * 2, el = (rnd() * 0.9 + 0.1) * up, v = speed * (0.4 + rnd() * 0.8);
+    P.push({ v: [Math.cos(a) * spread * v * (1 - el * 0.5), el * v, Math.sin(a) * spread * v * (1 - el * 0.5)], spin: [rnd() * 8 - 4, rnd() * 8 - 4, rnd() * 8 - 4], s: size * (0.6 + rnd() * 0.8), delay: rnd() * 0.15 });
+    if (kind !== 'bills') { c.set(pal[i % pal.length]); m.setColorAt(i, c); }
+  }
+  m.castShadow = true; m.frustumCulled = false;
+  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  m.update = t => {
+    for (let i = 0; i < count; i++) {
+      const o = P[i], tt = Math.max(0, t - t0 - o.delay);
+      const drag = kind === 'debris' ? 1 : 0.55;   // paper flutters down slower
+      p.set(origin[0] + o.v[0] * tt * drag, origin[1] + o.v[1] * tt - 0.5 * gravity * drag * tt * tt, origin[2] + o.v[2] * tt * drag);
+      const landed = p.y <= 0.01; if (landed) p.y = 0.01;
+      const flut = landed ? 0 : tt;
+      e.set(o.spin[0] * flut + (landed ? Math.PI / 2 : 0), o.spin[1] * flut, o.spin[2] * flut); q.setFromEuler(e);
+      sc.setScalar(t < t0 ? 0 : o.s); M.compose(p, q, sc); m.setMatrixAt(i, M);
+    }
+    m.instanceMatrix.needsUpdate = true;
+  };
+  m.update(0);
+  return m;
+}

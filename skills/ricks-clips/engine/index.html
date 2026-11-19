@@ -15,6 +15,9 @@
     -webkit-text-stroke: 9px #0d0b0a; paint-order: stroke fill;
     text-shadow: 0 4px 0 #0d0b0a, 0 6px 14px rgba(0,0,0,.45);
   }
+  #xfade { position: absolute; left: 0; top: 0; width: 720px; height: 1280px; opacity: 0; pointer-events: none; }
+  #dash { position: absolute; left: 34px; right: 34px; top: 40px; display: none; color: #fff; font: 600 17px/1.5 'Courier New', monospace; text-shadow: 0 0 3px rgba(0,0,0,.8); letter-spacing: 1px; }
+  #dash .rec { color: #ff3b30; } #dash .spd { float: right; }
   #fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
   #flash { position: absolute; inset: 0; background: #eaf3ff; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
   #hud { position: fixed; left: 730px; top: 10px; color: #aaa; font: 13px monospace; }
@@ -27,7 +30,7 @@
 </script>
 </head>
 <body>
-<div id="stage"><div id="flash"></div><div id="fade"></div><div id="cap"></div></div>
+<div id="stage"><canvas id="xfade" width="720" height="1280"></canvas><div id="dash"></div><div id="flash"></div><div id="fade"></div><div id="cap"></div></div>
 <div id="hud"></div>
 <script type="module" src="./src/main.js"></script>
 </body>

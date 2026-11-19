@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import * as EDIT from './shots.js';
@@ -9,6 +10,9 @@ const { SHOTS, CAPTIONS, DURATION, FADES } = EDIT;
 // TRANSITIONS (optional export of shots.js): [{ t, type, dur? }] centred on a cut at t.
 //   whip-left / whip-right / whip-up / whip-down : a fast pan blur that hides the cut (0.24 s)
 //   punch : a quick zoom-in into the new shot (0.2 s)      flash : a white pop (0.16 s)      blur : a soft radial dissolve (0.3 s)
+//   dissolve : a short crossfade between the two shots (0.3 s) - the references' most common way to change place
+//   zoom : rush into the centre of the outgoing shot and land in the next (0.5 s) - aim it at an eye, a window, a hole
+//          and open the next shot on a similar round shape (match cut)
 const TRANSITIONS = EDIT.TRANSITIONS || [];
 import { MOODS, skyMaterial } from './world.js';
 import { CHAR } from './toon.js';
@@ -57,12 +61,15 @@ export function makeStage({ mood = 'day', shadowSize = 4, target = [0, 0, 0], fo
 const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4, type: THREE.HalfFloatType });
 const composer = new EffectComposer(renderer, rt);
 const renderPass = new RenderPass(new THREE.Scene(), new THREE.PerspectiveCamera());
+const bokeh = new BokehPass(new THREE.Scene(), new THREE.PerspectiveCamera(), { focus: 2, aperture: 0, maxblur: 0.01 });
 const bloom = new UnrealBloomPass(new THREE.Vector2(W / 2, H / 2), 0.3, 0.5, 1.0);
 const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) } },
+  uniforms: { tDiffuse: { value: null }, uVig: { value: 0.32 }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uTint: { value: new THREE.Vector3(1, 1, 1) }, uLens: { value: 0 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon; uniform vec3 uTint; varying vec2 vUv;
-    void main(){ vec4 c = texture2D(tDiffuse, vUv);
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig, uSat, uCon, uLens; uniform vec3 uTint; varying vec2 vUv;
+    void main(){ vec2 d = vUv - 0.5; vec2 da = d * vec2(0.5625, 1.); float r2 = dot(da, da);
+      vec2 uv = 0.5 + d * (1. + uLens * r2) / (1. + uLens * 0.3);   // barrel distortion: very wide lenses in cars and rooms
+      vec4 c = texture2D(tDiffuse, clamp(uv, 0.001, 0.999));
       float l = dot(c.rgb, vec3(0.299,0.587,0.114));
       c.rgb = mix(vec3(l), c.rgb, uSat);
       c.rgb = (c.rgb - 0.5) * uCon + 0.5;
@@ -83,6 +90,7 @@ const trans = new ShaderPass({
       gl_FragColor = acc / 32.; }`,
 });
 composer.addPass(renderPass);
+composer.addPass(bokeh);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 composer.addPass(grade);
@@ -149,18 +157,23 @@ function getShot(i) {
 }
 
 window.DURATION = DURATION;
-window.renderAt = (t) => {
-  let idx = SHOTS.findIndex(s => t >= s.start && t < s.end);
-  if (idx < 0) idx = SHOTS.length - 1;
+const dashEl = document.getElementById('dash');
+const xfadeEl = document.getElementById('xfade'), xctx = xfadeEl.getContext('2d');
+function shotIndex(t) { let i = SHOTS.findIndex(s => t >= s.start && t < s.end); return i < 0 ? SHOTS.length - 1 : i; }
+// render shot idx at global time t into the WebGL canvas; returns what update() returned
+function renderShot(idx, t, extra) {
   const def = SHOTS[idx];
   const shot = getShot(idx);
-  const lt = t - def.start;
-  const r = shot.update(lt, t) || {};
+  const r = shot.update(t - def.start, t) || {};
   const cam = shot.camera;
   cam.aspect = W / H; cam.updateProjectionMatrix();
   const ud = shot.scene.userData;
   if (ud.sky) { ud.sky.position.copy(cam.position); ud.sky.material.uniforms.time.value = t; }
-  renderPass.scene = shot.scene; renderPass.camera = cam;
+  renderPass.scene = bokeh.scene = shot.scene; renderPass.camera = bokeh.camera = cam;
+  // depth of field: return { dof: { focus: metres to the subject, blur: 0..1 } } - soft backgrounds like the references
+  const dof = r.dof;
+  bokeh.enabled = !!(dof && (dof.blur ?? 0.5) > 0);
+  if (bokeh.enabled) { bokeh.uniforms.focus.value = dof.focus ?? cam.position.length(); bokeh.uniforms.aperture.value = 0.0025 * (dof.blur ?? 0.5); bokeh.uniforms.maxblur.value = 0.012 * (dof.blur ?? 0.5) + 0.002; bokeh.uniforms.nearClip.value = cam.near; bokeh.uniforms.farClip.value = cam.far; }
   bloom.strength = r.bloom ?? 0.3;
   bloom.threshold = r.bloomThreshold ?? 1.0;
   CHAR.lo.value = r.charLight?.[0] ?? 0.72; CHAR.hi.value = r.charLight?.[1] ?? 1.0;
@@ -168,10 +181,18 @@ window.renderAt = (t) => {
   grade.uniforms.uVig.value = r.vignette ?? 0.32;
   grade.uniforms.uSat.value = r.saturation ?? 1.12;
   grade.uniforms.uTint.value.set(...(r.tint || [1, 1, 1]));
+  grade.uniforms.uLens.value = r.lens ?? 0;
+  extra(r);
+  composer.render();
+  return r;
+}
+
+window.renderAt = (t) => {
+  const idx = shotIndex(t);
   // transitions
-  let dir = [0, 0], zoom = 1, rad = 0, tflash = 0;
+  let dir = [0, 0], zoom = 1, rad = 0, tflash = 0, xf = null;
   for (const tr of TRANSITIONS) {
-    const d = tr.dur ?? ({ punch: 0.2, flash: 0.16, blur: 0.3 }[tr.type] ?? 0.24), x = (t - tr.t) / (d / 2);
+    const d = tr.dur ?? ({ punch: 0.2, flash: 0.16, blur: 0.3, dissolve: 0.3, zoom: 0.5 }[tr.type] ?? 0.24), x = (t - tr.t) / (d / 2);
     if (Math.abs(x) >= 1) continue;
     const k = 1 - Math.abs(x), e = k * k * (3 - 2 * k);
     if (tr.type.startsWith('whip')) {
@@ -180,10 +201,27 @@ window.renderAt = (t) => {
     } else if (tr.type === 'punch') { if (x > 0) zoom = 1 + 0.12 * (1 - x) ** 2; rad = 0.08 * e; }
     else if (tr.type === 'flash') tflash = Math.max(tflash, e * 0.9);
     else if (tr.type === 'blur') rad = 0.22 * e;
+    else if (tr.type === 'dissolve' || tr.type === 'zoom') { const u = (x + 1) / 2; xf = { a: shotIndex(tr.t - 1e-3), b: shotIndex(tr.t + 1e-3), k: u * u * (3 - 2 * u), zoom: tr.type === 'zoom', u }; }
   }
-  trans.enabled = dir[0] !== 0 || dir[1] !== 0 || zoom !== 1 || rad !== 0;
-  trans.uniforms.uDir.value.set(dir[0], dir[1]); trans.uniforms.uZoom.value = zoom; trans.uniforms.uRad.value = rad;
-  composer.render();
+  const setTrans = () => {
+    trans.enabled = dir[0] !== 0 || dir[1] !== 0 || zoom !== 1 || rad !== 0;
+    trans.uniforms.uDir.value.set(dir[0], dir[1]); trans.uniforms.uZoom.value = zoom; trans.uniforms.uRad.value = rad;
+  };
+  // dissolve: render the outgoing shot, keep it in a 2D canvas on top, render the incoming one under it
+  if (xf && xf.a !== xf.b) {
+    // zoom: rush into the centre of the outgoing shot (aim it at an eye, a window, a hole) and land in the next one
+    if (xf.zoom) { zoom = 1 + 3 * xf.u ** 2; rad = 0.25 * xf.u; xf.k = Math.min(1, Math.max(0, (xf.u - 0.35) / 0.4)); }
+    renderShot(xf.a, t, setTrans);
+    if (xf.zoom) { zoom = 1 + 0.6 * (1 - xf.u) ** 2; rad = 0.2 * (1 - xf.u); }
+    xctx.clearRect(0, 0, W, H); xctx.drawImage(renderer.domElement, 0, 0, W, H);
+    xfadeEl.style.opacity = 1 - xf.k;
+  } else xfadeEl.style.opacity = 0;
+  const r = renderShot(xf && xf.a !== xf.b ? xf.b : idx, t, setTrans);
+  // dashcam overlay: return { dashcam: { speed: 54, stamp: '11/07/2026 06:41:53 AM' } }
+  if (r.dashcam) {
+    dashEl.style.display = 'block';
+    dashEl.innerHTML = `<span class="rec">● REC</span><span class="spd">${Math.round(r.dashcam.speed ?? 0)} MPH</span><br><span>${r.dashcam.stamp || ''}</span><span class="spd">FRONT · 1080P</span>`;
+  } else dashEl.style.display = 'none';
   drawCaption(t);
   let f = 0;
   for (const [a, b, c2, d] of FADES) if (t >= a && t < d) f = Math.max(f, t < b ? (t - a) / (b - a) : t < c2 ? 1 : (d - t) / (d - c2));
