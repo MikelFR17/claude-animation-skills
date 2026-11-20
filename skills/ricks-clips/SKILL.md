@@ -95,6 +95,9 @@ Then build it with the engine (below) and hand over the mp4 together with the pl
 
 ---
 
+## Production: Blender renderer (in progress)
+`blender/PLAN.md` is the build plan for rendering these shorts in Blender on the user's PC: realistic sets with real light, expressive 3D characters with a full rig, a geometric face, lip sync and an action library, and GPU rendering. A Claude Code session running on that PC builds and tests it milestone by milestone. Until it is finished, the three.js engine below is the renderer.
+
 ## Production: the engine
 A worked example comes with it. `engine/` is a finished 31 s short, built on real CC0 models (a Poly Haven galleon, cannons, barrels, crates, a chest, lanterns and cabin furniture, plus HDRI skies). Before the first render, download them with `python3 "$KIT/assets.py" model <id>` / `hdri <id>` for every entry in `ASSETS` in `src/shots.js`. **"Why Every Old Ship Had a Cat"**, with its `plan.md`, `sound.json` and 11 shots: sailors hauling at golden hour, the cat on a barrel, rats in a dark hold lit by a lantern and a shaft of daylight, a rat chewing rope, a sick sailor, the cat pouncing into the light, a sailor petting it at sunset, a night storm with lightning, a 1975 navy order stamped "BANNED", and the cat turning to the camera.
 
